@@ -1,6 +1,6 @@
-from dependences import Valid
-from hash import hash3
-from jwt import JWT
+from auth.dependences import Valid
+from auth.hash import hash3
+from auth.jwt import JWT
 from connect.manager_database import main_database
 from sqlalchemy import  text
 
@@ -15,14 +15,17 @@ class Login:
         self.Pass = Pass
         self.hash = hash3()
         self.db = self.read()
-        self.hashPass =  self.hash.encoder_hash(self.Pass)
+        self.hashPass =  Pass
        
         
     def read(self) -> dict:
         
-        email =  self.hash.encoder_hash(self.email)
+        
+        
+        passw = self.hash.encoder_bcr(self.Pass)
+        #print(passw.decode())
         with engine.connect() as session:
-                data = session.execute(text('SELECT * from Users where email= :email'), {"email": email})
+                data = session.execute(text('SELECT * from users where email= :email'), {"email": self.email})
                 user = data.fetchone()
                 
                 return  {
@@ -39,6 +42,7 @@ class Login:
         return check
     
     def login(self) -> str | bool | dict:
+        
         if self.db is None:
             return {"status": False}
         
@@ -67,15 +71,7 @@ class valid_jwt:
         }
         
         
-        
-    
-        
-    
-    
-        
-        
-        
-        
+
         
         
         

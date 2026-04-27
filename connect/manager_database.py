@@ -1,4 +1,4 @@
-from database import SupabaseConnect
+from connect.database import SupabaseConnect
 from core.config import data
 
 def main_database():#CHAMA CONGIG E DATABASE E CONECTA TUDO

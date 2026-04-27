@@ -1,5 +1,5 @@
-from hash import hash3
-from jwt import JWT
+from auth.hash import hash3
+from auth.jwt import JWT
 from connect.manager_database import main_database
 from sqlalchemy import  text
 
@@ -15,7 +15,7 @@ class Valid:
     def auth_admin(self, token:bytes) -> bool:
         data = self.jwt.decode(token)
         with engine.connect() as session:
-                data = session.execute(text(f'SELECT * from Users where user_id= :user_id'), {"user_id": data["user_id"]})
+                data = session.execute(text(f'SELECT * from users where user_id= :user_id'), {"user_id": data["user_id"]})
                 user = data.fetchone()
         role = self.jwt.get_jwt(token=token, data="role")
        
@@ -25,7 +25,7 @@ class Valid:
     def auth_jwt(self, token:bytes) -> bool:
         data = self.jwt.decode(token)
         with engine.connect() as session:
-                data = session.execute(text(f'SELECT * from Users where user_id= :user_id'), {"user_id": data["user_id"]})
+                data = session.execute(text(f'SELECT * from users where user_id= :user_id'), {"user_id": data["user_id"]})
                 user = data.fetchone()
                        
         
@@ -34,10 +34,10 @@ class Valid:
      
 
             
-    def valid_pass(self, value:str, check_value:bytes) ->bool:
+    def valid_pass(self, value:str, check_value:str) ->bool:
         
             return self.hash.check_pw(
-                data=self.hash.encoder_bcr(value),
+                data=value,
                 new_data=check_value
             )
         
