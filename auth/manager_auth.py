@@ -45,12 +45,12 @@ class Login:
     def login(self) -> str | bool | dict:
         
         if self.db is None:
-            return {"status": False}
+            return {"exists":False, "status": False, "token":None}
         
         if not self.valid_pass():
-            return "invalid pass"
+            return {"exists":True, "status": False, "token":None}
         token = data.token(email=self.db["email"], user_id=self.db["user_id"], role=self.db["role"], status=self.db["status"])
-        return token
+        return {"exists":True, "status": True, "token":token}
  
     
 class valid_jwt:

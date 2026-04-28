@@ -44,7 +44,7 @@ class Auth_Pass:
         msg.set_content(f"""
 Olá,
 
-Seu código de verificação é:
+Seu código de para alterar senha é:
 
 {self.cod}
 
@@ -63,4 +63,5 @@ Se você não solicitou isso, ignore este e-mail.
     
 
     
+
     

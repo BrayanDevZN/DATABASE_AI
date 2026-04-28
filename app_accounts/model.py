@@ -2,12 +2,12 @@ from pydantic import BaseModel,  Field, field_validator
 
 class Model_user(BaseModel):
     
-    name:str 
-    email:str
-    token:str
-    password:str = Field(...,min_length=8)
-    role:str = Field(default="user")
-    status:bool = Field(default=True)
+    name:str | None = None
+    email:str | None = None
+    token:str | None = None
+    password:str | None = Field(default=None ,min_length=8)
+    role:str | None = Field(default="user")
+    status:bool | None = Field(default=True)
     @field_validator("email")
     def valid_email(cls, v):
         if not "@gmail.com" in v:
@@ -30,4 +30,3 @@ class Model_user(BaseModel):
             raise ValueError(f"not letter in {v}")
         
         return v
-        
