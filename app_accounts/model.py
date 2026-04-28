@@ -1,8 +1,10 @@
 from pydantic import BaseModel,  Field, field_validator
 
 class Model_user(BaseModel):
+    
     name:str 
     email:str
+    token:str
     password:str = Field(...,min_length=8)
     role:str = Field(default="user")
     status:bool = Field(default=True)

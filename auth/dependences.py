@@ -36,6 +36,7 @@ class Valid:
             
     def valid_pass(self, value:str, check_value:str) ->bool:
         
+       
             return self.hash.check_pw(
                 data=value,
                 new_data=check_value

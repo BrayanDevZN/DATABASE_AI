@@ -41,6 +41,7 @@ class Login:
         check = Valid_data.valid_pass(value=self.Pass, check_value=self.db["password"])
         return check
     
+    
     def login(self) -> str | bool | dict:
         
         if self.db is None:

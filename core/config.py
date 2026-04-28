@@ -9,6 +9,7 @@ class data:
         self.__dbhost = os.getenv("DB_HOST")
         self.__dbpass = os.getenv("DB_PASSWORD")
         self.__secret = os.getenv("SECRET")
+        self.__email = os.getenv("KEY_EMAIL")
         
     def db_name(self) -> str:
         return self.__dbname
@@ -30,6 +31,12 @@ class data:
     
     def secret(self) ->str:
         return self.__secret
+    
+    def key_email(self) -> str:
+        return self.__email
+    def email_user(self) -> str:
+        return os.getenv("EMAIL_USER")
+    
         
     
         
