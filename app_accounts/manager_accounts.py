@@ -6,21 +6,25 @@ from auth.auth_pass import Auth_Pass
 from auth.auth_email import CreateAccountCode
 from auth.hash import hash3
 from app_accounts.repository import RepositoryAccount
+from auth.jwt import JWT
+from auth.dependences import Valid
 
 class create_User:
     
-    def env_code(self, email:str) -> None:
-        data = Model_user(email=email)
+    def env_code(self, data:dict) -> None:
+        Data = Model_user(email=data["email"])
         
-        code = CreateAccountCode(data.email)
+        code = CreateAccountCode(Data.email)
         code.execute()
-        return email
+        return Data.email
     
     def create(self, Data: dict) -> str | None:
         user = Model_user(
             email=Data["email"],
             name=Data["name"],
-            password=Data["password"]
+            password=Data["password"], 
+            age=Data["age"],
+            gender=Data["gender"]
         )
 
         valid_code = Service().valid_createAccount_code(
@@ -28,31 +32,89 @@ class create_User:
             code=Data["code"]
         )
 
-        print(valid_code)  # teste pra ver o que está vindo
+        print(valid_code)  
 
         if valid_code["status"] and not valid_code["expired"]:
             Service().create_account(
                 name=user.name,
                 email=user.email,
-                password=user.password
+                password=user.password,
+                age=user.age,
+                gender=user.gender
+                
             )
 
             return Login(email=user.email, Pass=user.password).login()
 
         return None
     
+    def valid_user(self, data:dict) -> bool:
+        user = Model_user(name=data["email"]).email
+        return {"exists":True} if RepositoryAccount().select_by_email(user) is not None else {"exists":False}
+        
     
-aaa = create_User()
-#aaa.env_code("flowr3898@gmail.com")
-print(aaa.create({"email": "flowr3898@gmail.com", "password":"13Marco1978", "name":"brayan", "code":"216571"}))
+class User_Login:
+    def login(self, data:dict) ->str:
+            email = Model_user(email=data["email"]).email
+            Pass = Model_user(password=data["password"]).password
+            return Login(email=email, Pass=Pass).login()
+        
+    def Env_codePass(self, token:str) -> bool:
+      
+        new_token = valid_jwt(token).validation()
+        if new_token["is_valid"]:
+            id = JWT().get_jwt(key="user_id", token=token)
+            email = JWT().get_jwt(key="email", token=token)
+            env = Auth_Pass(id=id, email=email).execute()
+            return True
+        return False
     
+    def updateAuth_Pass(self,data:dict) ->dict:
+        code = data["code"]
+        token = Model_user(token=data["token"]).token
+        new_pass = Model_user(password=data["password"]).password
+        
+        new_token = valid_jwt(token).validation()
+        valid_code = Service().valid_code(token=token, code=code)
+        print(valid_code)
+        if new_token["is_valid"] and (valid_code["status"] and not valid_code["expired"]):
+            id = JWT().get_jwt(key="user_id", token=token)
+            user = RepositoryAccount().select(id)
+            password = user["password"]
+            if hash3().check_pw(data=new_pass,  new_data=password):
+                return {"status": "equal"}
+            Service().update_AuthPass(token=token, Pass=new_pass)
+            return {"status": True}
+        return {"status": False}
+    
+    def check_pass(self, data:dict) -> dict:
+        
+        valid = Service().valid_pass(Pass=Model_user(password=data["password"]).password, token=Model_user(token=data["token"]))
+        if valid and (valid is not None):
+            return {"status": True, "valid": valid}
+        {"status": False, "valid": False}
+        
+    def update_Pass(self, data:dict) -> dict:
         
         
+            token = Model_user(token=data["token"]).token
+            Pass = RepositoryAccount().select(JWT().get_jwt(key="user_id", token=token))
+            if valid_jwt(token=token).validation["is_valid"]:
+                result = Service().update_pass(token=token, new_pass=Model_user(password=data["password"]).password)
+                
+                return {"status":result}
+                
+                
+        
+            
         
         
-        
-        
-        
+ab = create_User()      
+aa = User_Login()
+#ab.env_code({"email":"flowr3898@gmail.com"})
+
+token = aa.login({"email": "flowr3898@gmail.com", "password": "13Marco1978"})
+print(token)
     
         
         

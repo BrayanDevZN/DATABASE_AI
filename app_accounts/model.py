@@ -5,6 +5,8 @@ class Model_user(BaseModel):
     name:str | None = None
     email:str | None = None
     token:str | None = None
+    gender:str | None = None
+    age:int | None = None
     password:str | None = Field(default=None ,min_length=8)
     role:str | None = Field(default="user")
     status:bool | None = Field(default=True)

@@ -14,21 +14,25 @@ class RepositoryAccount:
         email: str,
         password: str,
         role: str,
-        status: bool
+        status: bool,
+        gender:str,
+        age:int
     ) -> dict | None:
         with self.db.connect() as session:
             result = session.execute(
                 text("""
-                    INSERT INTO users (name, email, password, role, status)
-                    VALUES (:name, :email, :password, :role, :status)
-                    RETURNING user_id, name, email, password, role, status, created_at
+                    INSERT INTO users (name, email, password, role, status, age, gender)
+                    VALUES (:name, :email, :password, :role, :status, :age, :gender)
+                    RETURNING user_id, name, email, password, role, status, created_at, age, gender
                 """),
                 {
                     "name": name,
                     "email": email,
                     "password": password,
                     "role": role,
-                    "status": status
+                    "status": status,
+                    "age": age,
+                    "gender":gender
                 }
             )
 
@@ -41,7 +45,7 @@ class RepositoryAccount:
         with self.db.connect() as session:
             result = session.execute(
                 text("""
-                    SELECT user_id, name, email, password, role, status, created_at
+                    SELECT user_id, name,gender, age, email, password, role, status, created_at
                     FROM users
                     WHERE user_id = :user_id
                 """),
@@ -56,7 +60,7 @@ class RepositoryAccount:
         with self.db.connect() as session:
             result = session.execute(
                 text("""
-                    SELECT user_id, name, email, password, role, status, created_at
+                    SELECT user_id, name,gender, age, email, password, role, status, created_at
                     FROM users
                     WHERE email = :email
                 """),
@@ -71,7 +75,7 @@ class RepositoryAccount:
         with self.db.connect() as session:
             result = session.execute(
                 text("""
-                    SELECT user_id, name, email, password, role, status, created_at
+                    SELECT user_id, name,gender, age, email, password, role, status, created_at
                     FROM users
                     ORDER BY user_id
                 """)

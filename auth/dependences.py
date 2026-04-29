@@ -17,9 +17,9 @@ class Valid:
         with engine.connect() as session:
                 data = session.execute(text(f'SELECT * from users where user_id= :user_id'), {"user_id": data["user_id"]})
                 user = data.fetchone()
-        role = self.jwt.get_jwt(token=token, data="role")
+        role = self.jwt.get_jwt(token=token, key="role")
        
-        return True if (self.jwt.get_jwt(token=token, data="role") == "admin") and (user["role"] == role) else False
+        return True if (self.jwt.get_jwt(token=token, key="role") == "admin") and (user["role"] == role) else False
         
     
     def auth_jwt(self, token:bytes) -> bool:
