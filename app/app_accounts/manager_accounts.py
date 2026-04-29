@@ -120,16 +120,7 @@ class User_Login:
             
         
         
-ab = create_User()      
-aa = User_Login()
-#ab.env_code({"email":"flowr3898@gmail.com"})
 
-token = aa.login({"email": "flowr3898@gmail.com", "password": "13Marco1978"})["token"]
-print(token)
-
-    
-
-    
 
         
         
