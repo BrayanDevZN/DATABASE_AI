@@ -1,11 +1,11 @@
-from app_accounts.repository import RepositoryAccount
-from app_accounts.model import Model_user
-from app_accounts.service import Service
+from app.app_accounts.repository import RepositoryAccount
+from app.app_accounts.model import Model_user
+from app.app_accounts.service import Service
 from auth.manager_auth import Login, valid_jwt
 from auth.auth_pass import Auth_Pass
 from auth.auth_email import CreateAccountCode
 from auth.hash import hash3
-from app_accounts.repository import RepositoryAccount
+from app.app_accounts.repository import RepositoryAccount
 from auth.jwt import JWT
 from auth.dependences import Valid
 
@@ -87,22 +87,33 @@ class User_Login:
             return {"status": True}
         return {"status": False}
     
-    def check_pass(self, data:dict) -> dict:
+    def check_pass(self, data: dict) -> dict:
+        token = Model_user(token=data["token"]).token
+        password = Model_user(password=data["password"]).password
+
+        valid = Service().valid_pass(
+            Pass=password,
+            token=token
+        )
+
+        if valid == "none_pass":
+            return {"status": False, "valid": valid}
+
+        return {"status": True, "valid": valid}
+
+    def update_Pass(self, data: dict) -> dict:
+        token = Model_user(token=data["token"]).token
+        new_password = Model_user(password=data["password"]).password
+        valid = data["valid"]
+
+        result = Service().update_pass(
+            token=token,
+            valid=valid,
+            new_pass=new_password
+        )
+
+        return {"status": result}
         
-        valid = Service().valid_pass(Pass=Model_user(password=data["password"]).password, token=Model_user(token=data["token"]))
-        if valid and (valid is not None):
-            return {"status": True, "valid": valid}
-        {"status": False, "valid": False}
-        
-    def update_Pass(self, data:dict) -> dict:
-        
-        
-            token = Model_user(token=data["token"]).token
-            Pass = RepositoryAccount().select(JWT().get_jwt(key="user_id", token=token))
-            if valid_jwt(token=token).validation["is_valid"]:
-                result = Service().update_pass(token=token, new_pass=Model_user(password=data["password"]).password)
-                
-                return {"status":result}
                 
                 
         
@@ -113,14 +124,9 @@ ab = create_User()
 aa = User_Login()
 #ab.env_code({"email":"flowr3898@gmail.com"})
 
-token = aa.login({"email": "flowr3898@gmail.com", "password": "13Marco1978"})
+token = aa.login({"email": "flowr3898@gmail.com", "password": "13Marco1978"})["token"]
 print(token)
-    
-        
-        
-    
-        
-        
+
     
 
     

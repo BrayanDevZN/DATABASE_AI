@@ -1,4 +1,4 @@
-from app_accounts.repository import RepositoryAccount
+from app.app_accounts.repository import RepositoryAccount
 from auth.jwt import JWT
 from auth.manager_auth import valid_jwt
 from auth.dependences import Valid
@@ -17,25 +17,44 @@ class Service:
         self.app.create(email=email, name=name, password=Pass, status=False, role="user", age=age, gender=gender)
         return True
         
-    def valid_pass(self, Pass:str, token:str)  -> bool | None:
-        if valid_jwt(token=token).validation()["is_valid"]:
-            Pass_account = self.app.select(user_id=self.jwt.get_jwt(key="user_id", token=token))
-            if self.valid.valid_pass(value=Pass, check_value=Pass_account):
-                return self.hash.encoder_bcr("true_pass")
-            return self.hash.encoder_bcr("false_pass")
-        return  self.hash.encoder_bcr("none_pass")
-            
-        
-    def update_pass(self, token:str, valid:str, new_pass:str) ->None | bool:
-        if self.hash.check_pw(data="none_pass", new_data=valid) or self.hash.check_pw(data="false_pass", new_data=valid):
-            return None
-        if self.hash.check_pw(data="true_pass", new_data=valid) :
-            if valid_jwt(token=token).validation()["is_valid"]:
-                if  self.hash.check_pw(data=self.valid_pass(Pass=new_pass, token=token), new_data="true_pass"):
-                    self.app.update(user_id=self.jwt.get_jwt(key="user_id", token=token), password=self.hash.encoder_bcr(new_pass))
-                    return True
-                return False
-       
+    def valid_pass(self, Pass: str, token: str) -> str:
+        if not valid_jwt(token=token).validation()["is_valid"]:
+            return "none_pass"
+
+        user_id = self.jwt.get_jwt(key="user_id", token=token)
+        user = self.app.select(user_id)
+
+        if not user:
+            return "none_pass"
+
+        password_db = user["password"]
+
+        if self.hash.check_pw(data=Pass, new_data=password_db):
+            return "true_pass"
+
+        return "false_pass"
+
+    def update_pass(self, token: str, valid: str, new_pass: str) -> bool:
+        if not valid_jwt(token=token).validation()["is_valid"]:
+            return False
+
+        if valid == "none_pass":
+            return False
+
+        if valid == "true_pass":
+            return False
+
+        if valid == "false_pass":
+            user_id = self.jwt.get_jwt(key="user_id", token=token)
+
+            self.app.update(
+                user_id=user_id,
+                password=self.hash.encoder_bcr(new_pass)
+            )
+
+            return True
+
+        return False
     
     def valid_code(self, token:str, code:str) -> dict:
             from sqlalchemy import text
