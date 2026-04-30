@@ -91,31 +91,53 @@ class User_Login:
         token = Model_user(token=data["token"]).token
         password = Model_user(password=data["password"]).password
 
-        valid = Service().valid_pass(
-            Pass=password,
-            token=token
-        )
+        valid = Service().valid_pass(Pass=password, token=token)
 
-        if valid == "none_pass":
-            return {"status": False, "valid": valid}
+        if valid != "true_pass":
+            return {"status": False}
 
-        return {"status": True, "valid": valid}
+        user_id = JWT().get_jwt(key="user_id", token=token)
+
+        change_token = JWT().token_password_change(user_id=user_id)
+
+        return {
+            "status": True,
+            "change_token": change_token
+        }
 
     def update_Pass(self, data: dict) -> dict:
-        token = Model_user(token=data["token"]).token
+        change_token = data["token"]
         new_password = Model_user(password=data["password"]).password
-        valid = data["valid"]
 
-        result = Service().update_pass(
-            token=token,
-            valid=valid,
+        payload = JWT().validate_password_change_token(change_token)
+
+        if not payload["valid"]:
+            return {"status": False}
+
+        result = Service().update_pass_by_user_id(
+            user_id=payload["user_id"],
             new_pass=new_password
         )
 
         return {"status": result}
-        
-                
-                
+    def update_name(self, data: dict) -> dict:
+        token = Model_user(token=data["token"]).token
+        new_name = Model_user(name=data["name"]).name
+
+        valid_token = valid_jwt(token).validation()
+
+        if not valid_token["is_valid"]:
+            return {"status": False}
+
+        result = Service().update_name(
+            new_name=new_name,
+            token=token
+        )
+
+        return result
+            
+    
+ 
         
             
         

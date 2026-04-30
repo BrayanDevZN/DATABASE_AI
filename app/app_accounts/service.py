@@ -193,6 +193,22 @@ class Service:
           
           return {"status":False}
       
+    def update_pass_by_user_id(self, user_id: int, new_pass: str) -> bool | str:
+        user = self.app.select(user_id)
+
+        if not user:
+            return False
+
+        if self.hash.check_pw(data=new_pass, new_data=user["password"]):
+            return "equal"
+
+        self.app.update(
+            user_id=user_id,
+            password=self.hash.encoder_bcr(new_pass)
+        )
+
+        return True
+      
     
         
         

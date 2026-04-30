@@ -1,5 +1,6 @@
 from jose import jwt, JWTError
 from core.config import data
+from datetime import datetime, timezone, timedelta
 
 
 class JWT:
@@ -37,3 +38,35 @@ class JWT:
             )
         except JWTError:
             return None
+        
+    def token_password_change(self, user_id: int) -> str:
+        payload = {
+            "user_id": user_id,
+            "type": "password_change",
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=10)
+        }
+
+        return jwt.encode(
+            payload,
+            data().secret(),
+            algorithm="HS256"
+        )
+
+    def validate_password_change_token(self, token: str) -> dict:
+        try:
+            payload = jwt.decode(
+                token,
+                data().secret(),
+                algorithms=["HS256"]
+            )
+
+            if payload.get("type") != "password_change":
+                return {"valid": False}
+
+            return {
+                "valid": True,
+                "user_id": payload["user_id"]
+            }
+
+        except JWTError:
+            return {"valid": False}

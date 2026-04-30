@@ -35,11 +35,11 @@ class data:
     def key_email(self) -> str:
         return self.__email
     def email_user(self) -> str:
-        return os.getenv("EMAIL_USER")
+        return self.__email
     
         
     
-        
+print(data().db_port())       
         
         
 print(data().db_host())
