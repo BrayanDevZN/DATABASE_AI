@@ -55,10 +55,10 @@ Esse código expira em 8 minutos.
 Se você não solicitou isso, ignore este e-mail.
 """)
 
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as smtp:
+            smtp.starttls()
             smtp.login(self.email_user, self.email_pass)
             smtp.send_message(msg)
-
     def execute(self) -> str:
         self.save()
         self.send()

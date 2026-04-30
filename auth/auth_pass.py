@@ -51,8 +51,9 @@ Seu código de para alterar senha é:
 Se você não solicitou isso, ignore este e-mail.
 """)
 
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-            smtp.login(self.email_user, self.key)
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as smtp:
+            smtp.starttls()
+            smtp.login(self.email_user, self.email_pass)
             smtp.send_message(msg)
 
     def execute(self) -> str:
