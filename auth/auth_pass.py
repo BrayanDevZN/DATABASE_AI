@@ -15,6 +15,8 @@ class Auth_Pass:
         self.email = email
         self.cod = ''.join(str(secrets.randbelow(10)) for _ in range(6))
         self.engine = main_database()
+        self.email_user = data().email_user()
+        self.email_pass = data().key_email()
 
     def get_code(self) -> str:
         return self.cod
@@ -35,26 +37,24 @@ class Auth_Pass:
             session.commit()
 
     def env(self) -> None:
-        msg = EmailMessage()
+        import resend
 
-        msg["Subject"] = "Código de verificação"
-        msg["From"] = self.email_user
-        msg["To"] = self.email
+        resend.api_key = self.email_pass  
 
-        msg.set_content(f"""
-Olá,
+        resend.Emails.send({
+            "from": "onboarding@resend.dev",
+            "to": self.email,
+            "subject": "Código de verificação",
+            "html": f"""
+            <p>Olá,</p>
 
-Seu código de para alterar senha é:
+            <p>Seu código para alterar senha é:</p>
 
-{self.cod}
+            <h2>{self.cod}</h2>
 
-Se você não solicitou isso, ignore este e-mail.
-""")
-
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as smtp:
-            smtp.starttls()
-            smtp.login(self.email_user, self.email_pass)
-            smtp.send_message(msg)
+            <p>Se você não solicitou isso, ignore este e-mail.</p>
+            """
+        })
 
     def execute(self) -> str:
         self.add()

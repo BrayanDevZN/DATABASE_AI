@@ -37,28 +37,24 @@ class CreateAccountCode:
             session.commit()
 
     def send(self) -> None:
-        msg = EmailMessage()
+        import resend
 
-        msg["Subject"] = "Código de criação de conta"
-        msg["From"] = self.email_user
-        msg["To"] = self.email
+        resend.api_key = self.email_pass  
 
-        msg.set_content(f"""
-Olá,
+        resend.Emails.send({
+            "from": "onboarding@resend.dev",
+            "to": self.email,
+            "subject": "Código de verificação",
+            "html": f"""
+            <p>Olá,</p>
 
-Seu código para criar conta é:
+            <p>Seu código para alterar senha é:</p>
 
-{self.code}
+            <h2>{self.cod}</h2>
 
-Esse código expira em 8 minutos.
-
-Se você não solicitou isso, ignore este e-mail.
-""")
-
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as smtp:
-            smtp.starttls()
-            smtp.login(self.email_user, self.email_pass)
-            smtp.send_message(msg)
+            <p>Se você não solicitou isso, ignore este e-mail.</p>
+            """
+        })
     def execute(self) -> str:
         self.save()
         self.send()
