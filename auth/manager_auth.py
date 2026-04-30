@@ -56,7 +56,7 @@ class Login:
         if not self.valid_pass():
             return {"exists":True, "status": False, "token":None}
         token = data.token(email=self.db["email"], user_id=self.db["user_id"], role=self.db["role"], status=self.db["status"])
-        return {"exists":True, "status": True, "token":token, "name": self.db["name"], "gender": self.db["gender"]}
+        return {"exists":True, "status": True, "token":token, "name": self.db["name"], "gender": self.db["gender"], "age":self.db["age"]}
  
     
 class valid_jwt:
