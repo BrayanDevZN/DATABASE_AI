@@ -1,53 +1,60 @@
 from fastapi import FastAPI, status
-import  api.model.model_accounts as models
-import  app.app_accounts.manager_accounts as manager
+import api.model.model_accounts as models
+import app.app_accounts.manager_accounts as manager
 
 app = FastAPI()
 
-    
+
 @app.post("/create_user", status_code=status.HTTP_201_CREATED)
 def create_user(data: models.CreateUser):
     return manager.create_User().create(data.model_dump())
 
+
 @app.post("/env_code_create", status_code=status.HTTP_201_CREATED)
-def env_create(data: models.ValidEmail):
+def env_code_create(data: models.ValidEmail):
     return manager.create_User().env_code(data.model_dump())
 
-@app.post("/valid_user", status_code=status.HTTP_201_CREATED)
+
+@app.post("/valid_user", status_code=status.HTTP_200_OK)
 def valid_user(data: models.ValidEmail):
-    return manager.create_User().env_code(data.model_dump())
+    return manager.create_User().valid_user(data.model_dump())
+
 
 @app.post("/login", status_code=status.HTTP_200_OK)
 def login(data: models.Login):
     return manager.User_Login().login(data.model_dump())
 
-@app.post("/Env_Pass", status_code=status.HTTP_201_CREATED)
-def env_pass(data: models.Env_CodePass):
-    return manager.User_Login().Env_codePass(data.model_dump())
 
-@app.patch("/updateAuth_pass", status_code=status.HTTP_200_OK)
-def env_AuthPass(data: models.UpdateAuthPass):
+@app.post("/env_pass", status_code=status.HTTP_200_OK)
+def env_pass(data: models.Env_CodePass):
+    return manager.User_Login().Env_codePass(data.model_dump()["token"])
+
+
+@app.patch("/update_auth_pass", status_code=status.HTTP_200_OK)
+def update_auth_pass(data: models.UpdateAuthPass):
     return manager.User_Login().updateAuth_Pass(data.model_dump())
+
 
 @app.patch("/update_pass", status_code=status.HTTP_200_OK)
 def update_pass(data: models.Pass):
     return manager.User_Login().update_Pass(data.model_dump())
 
+
 @app.post("/check_pass", status_code=status.HTTP_200_OK)
 def check_pass(data: models.Pass):
     return manager.User_Login().check_pass(data.model_dump())
 
-@app.patch("/update_name", status_code=status.HTTP_200_OK)
-def up_name(data: models.UpName):
-    return manager.User_Login().update_name(data.model_dump())
 
-@app.get("/docs")
+@app.patch("/update_name", status_code=status.HTTP_200_OK)
+def update_name(data: models.UpName):
+    return manager.User_Login().update_name(data.model_dump())
+@app.get("/docs_api")
 def docs_api():
     return {
         "create_user": {
             "method": "POST",
             "route": "/create_user",
-            "description": "Cria um usuário depois de validar o código enviado por email.",
+            "description": "Cria um usuário após validar código enviado por email.",
             "body": {
                 "email": "str",
                 "password": "str",
@@ -56,10 +63,7 @@ def docs_api():
                 "gender": "str",
                 "code": "int"
             },
-            "response": {
-                "success": "retorna login/token",
-                "error": None
-            }
+            "response": "token/login ou None"
         },
 
         "env_code_create": {
@@ -69,16 +73,13 @@ def docs_api():
             "body": {
                 "email": "str"
             },
-            "response": {
-                "success": "email",
-                "error": None
-            }
+            "response": "email"
         },
 
         "valid_user": {
             "method": "POST",
             "route": "/valid_user",
-            "description": "Verifica se o usuário já existe pelo email.",
+            "description": "Verifica se o email já existe no sistema.",
             "body": {
                 "email": "str"
             },
@@ -90,62 +91,56 @@ def docs_api():
         "login": {
             "method": "POST",
             "route": "/login",
-            "description": "Faz login com email e senha.",
+            "description": "Realiza login e retorna token.",
             "body": {
                 "email": "str",
                 "password": "str"
             },
-            "response": {
-                "success": "token/login",
-                "error": False
-            }
+            "response": "token"
         },
 
         "env_pass": {
             "method": "POST",
             "route": "/env_pass",
-            "description": "Envia código para alterar senha autenticada.",
+            "description": "Envia código para alteração de senha usando token.",
             "body": {
                 "token": "str"
             },
-            "response": {
-                "success": True,
-                "error": False
-            }
+            "response": "true/false"
         },
 
         "update_auth_pass": {
             "method": "PATCH",
             "route": "/update_auth_pass",
-            "description": "Atualiza senha usando token, código e nova senha.",
+            "description": "Atualiza senha com código + token.",
             "body": {
                 "code": "int",
                 "token": "str",
                 "password": "str"
             },
             "response": {
-                "status": "bool | equal"
+                "status": "true/false/equal"
             }
         },
 
         "check_pass": {
             "method": "POST",
             "route": "/check_pass",
-            "description": "Confere senha atual e retorna token temporário para troca.",
+            "description": "Valida senha atual e retorna token temporário para troca.",
             "body": {
                 "token": "str",
                 "password": "str"
             },
             "response": {
                 "status": "bool",
-                "change_token": "str | optional"
+                "change_token": "str (se válido)"
             }
         },
 
         "update_pass": {
             "method": "PATCH",
             "route": "/update_pass",
-            "description": "Atualiza senha usando change_token gerado pelo check_pass.",
+            "description": "Atualiza senha usando change_token.",
             "body": {
                 "token": "str",
                 "password": "str"
@@ -168,4 +163,3 @@ def docs_api():
             }
         }
     }
-

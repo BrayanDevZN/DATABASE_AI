@@ -1,11 +1,14 @@
 import os
 from dotenv import load_dotenv
+from pathlib import Path
+base_dir = Path(__file__).resolve().parent
+load_dotenv(base_dir / ".env")
 class data:
     def __init__(self) -> None:   #ESSA CLASSE SERVE PRA PEGAR OS DADOS DO BANCO DE DADOS
-        load_dotenv()
+        
         self.__dbname = os.getenv("DB_NAME")
         self.__dbUser = os.getenv("DB_USER")
-        self.__dbport = os.getenv("DB_PORT")
+        self.__dbport = int(os.getenv("DB_PORT"))
         self.__dbhost = os.getenv("DB_HOST")
         self.__dbpass = os.getenv("DB_PASSWORD")
         self.__secret = os.getenv("SECRET")
@@ -39,7 +42,3 @@ class data:
     
         
     
-print(data().db_port())       
-        
-        
-print(data().db_host())
