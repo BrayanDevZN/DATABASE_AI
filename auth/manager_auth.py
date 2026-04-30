@@ -20,24 +20,28 @@ class Login:
         
     def read(self) -> dict:
         
-        
-        
-        passw = self.hash.encoder_bcr(self.Pass)
-        #print(passw.decode())
         with engine.connect() as session:
-                data = session.execute(text('SELECT * from users where email= :email'), {"email": self.email})
-                user = data.fetchone()
-                
-                return  {
-                    "user_id": user[0],
-                    "name": user[1],
-                    "age": user[2],
-                    "gender": user[-1],
-                    "email": user[3],
-                    "password": user[4],
-                    "role": user[5],
-                    "status": user[6]
-                } if user is not None else None
+            data = session.execute(
+            text("""
+                SELECT user_id, name, age, gender, email, password, role, status
+                FROM users
+                WHERE email = :email
+            """),
+            {"email": self.email}
+        )
+
+            user = data.fetchone()
+
+            return {
+                "user_id": user[0],
+                "name": user[1],
+                "age": user[2],
+                "gender": user[3],
+                "email": user[4],
+                "password": user[5],
+                "role": user[6],
+                "status": user[7]
+            } if user is not None else None
             
     def valid_pass(self) -> bool:
         check = Valid_data.valid_pass(value=self.Pass, check_value=self.db["password"])
