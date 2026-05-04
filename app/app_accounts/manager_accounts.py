@@ -138,7 +138,7 @@ class User_Login:
     
     def valid_token(self, token:str) -> dict:
      
-        valid_tk = valid_jwt(token=token)
+        valid_tk = valid_jwt(token=token["token"])
         return valid_tk.validation()
     
     
