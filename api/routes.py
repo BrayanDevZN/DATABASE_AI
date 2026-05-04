@@ -1,6 +1,8 @@
 from fastapi import FastAPI, status
 import api.model.model_accounts as models
+import api.model.model_conversation as conversation_models
 import app.app_accounts.manager_accounts as manager
+import app.app_conversations.manager_conversation as conversation_manager
 
 
 app = FastAPI()
@@ -50,6 +52,32 @@ def check_pass(data: models.Pass):
 def update_name(data: models.UpName):
     return manager.User_Login().update_name(data.model_dump())
 
-@app.post("valid_token", status_code=status.HTTP_200_OK)
-def valid_token(data:models.ValidToken):
-    return manager.User_Login().valid_token(data)
+
+@app.post("/valid_token", status_code=status.HTTP_200_OK)
+def valid_token(data: models.ValidToken):
+    return manager.User_Login().valid_token(data.model_dump())
+
+
+@app.post("/conversation", status_code=status.HTTP_201_CREATED)
+def create_conversation(data: conversation_models.CreateConversationWithToken):
+    return conversation_manager.ManagerConversation().create(data.model_dump())
+
+
+@app.post("/conversations", status_code=status.HTTP_200_OK)
+def select_conversations(data: conversation_models.WithToken):
+    return conversation_manager.ManagerConversation().select_conversations(data.model_dump())
+
+
+@app.post("/conversation/messages", status_code=status.HTTP_200_OK)
+def select_by_conversation(data: conversation_models.GetConversation):
+    return conversation_manager.ManagerConversation().select_by_conversation(data.model_dump())
+
+
+@app.post("/conversation/user", status_code=status.HTTP_200_OK)
+def select_by_user(data: conversation_models.WithToken):
+    return conversation_manager.ManagerConversation().select_by_user(data.model_dump())
+
+
+@app.delete("/conversation", status_code=status.HTTP_200_OK)
+def delete_conversation(data: conversation_models.GetConversation):
+    return conversation_manager.ManagerConversation().delete_conversation(data.model_dump())
