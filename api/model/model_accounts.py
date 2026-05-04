@@ -51,3 +51,7 @@ class UpName(BaseModel):
 
     token: str
     name: str
+
+class ValidToken(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    token: str

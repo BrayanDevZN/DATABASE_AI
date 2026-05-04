@@ -2,6 +2,7 @@ from fastapi import FastAPI, status
 import api.model.model_accounts as models
 import app.app_accounts.manager_accounts as manager
 
+
 app = FastAPI()
 
 
@@ -48,118 +49,7 @@ def check_pass(data: models.Pass):
 @app.patch("/update_name", status_code=status.HTTP_200_OK)
 def update_name(data: models.UpName):
     return manager.User_Login().update_name(data.model_dump())
-@app.get("/docs_api")
-def docs_api():
-    return {
-        "create_user": {
-            "method": "POST",
-            "route": "/create_user",
-            "description": "Cria um usuário após validar código enviado por email.",
-            "body": {
-                "email": "str",
-                "password": "str",
-                "name": "str",
-                "age": "int",
-                "gender": "str",
-                "code": "int"
-            },
-            "response": "token/login ou None"
-        },
 
-        "env_code_create": {
-            "method": "POST",
-            "route": "/env_code_create",
-            "description": "Envia código de criação de conta para o email.",
-            "body": {
-                "email": "str"
-            },
-            "response": "email"
-        },
-
-        "valid_user": {
-            "method": "POST",
-            "route": "/valid_user",
-            "description": "Verifica se o email já existe no sistema.",
-            "body": {
-                "email": "str"
-            },
-            "response": {
-                "exists": "bool"
-            }
-        },
-
-        "login": {
-            "method": "POST",
-            "route": "/login",
-            "description": "Realiza login e retorna token.",
-            "body": {
-                "email": "str",
-                "password": "str"
-            },
-            "response": "token"
-        },
-
-        "env_pass": {
-            "method": "POST",
-            "route": "/env_pass",
-            "description": "Envia código para alteração de senha usando token.",
-            "body": {
-                "token": "str"
-            },
-            "response": "true/false"
-        },
-
-        "update_auth_pass": {
-            "method": "PATCH",
-            "route": "/update_auth_pass",
-            "description": "Atualiza senha com código + token.",
-            "body": {
-                "code": "int",
-                "token": "str",
-                "password": "str"
-            },
-            "response": {
-                "status": "true/false/equal"
-            }
-        },
-
-        "check_pass": {
-            "method": "POST",
-            "route": "/check_pass",
-            "description": "Valida senha atual e retorna token temporário para troca.",
-            "body": {
-                "token": "str",
-                "password": "str"
-            },
-            "response": {
-                "status": "bool",
-                "change_token": "str (se válido)"
-            }
-        },
-
-        "update_pass": {
-            "method": "PATCH",
-            "route": "/update_pass",
-            "description": "Atualiza senha usando change_token.",
-            "body": {
-                "token": "str",
-                "password": "str"
-            },
-            "response": {
-                "status": "bool"
-            }
-        },
-
-        "update_name": {
-            "method": "PATCH",
-            "route": "/update_name",
-            "description": "Atualiza nome do usuário autenticado.",
-            "body": {
-                "token": "str",
-                "name": "str"
-            },
-            "response": {
-                "status": "bool"
-            }
-        }
-    }
+@app.post("valid_token", status_code=status.HTTP_200_OK)
+def valid_token(data:models.ValidToken):
+    return manager.User_Login().valid_token(data)
