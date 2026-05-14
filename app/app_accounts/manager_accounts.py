@@ -3,7 +3,7 @@ from app.app_accounts.model import Model_user
 from app.app_accounts.service import Service
 from auth.manager_auth import Login, valid_jwt
 from auth.auth_pass import Auth_Pass
-from auth.auth_email import CreateAccountCode
+from auth.auth_email import Auth_Create
 from auth.hash import hash3
 from app.app_accounts.repository import RepositoryAccount
 from auth.jwt import JWT
@@ -14,7 +14,7 @@ class create_User:
     def env_code(self, data:dict) -> None:
         Data = Model_user(email=data["email"])
         
-        code = CreateAccountCode(Data.email)
+        code = Auth_Create(Data.email)
         code.execute()
         return Data.email
     

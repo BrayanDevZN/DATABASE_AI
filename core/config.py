@@ -14,6 +14,7 @@ class data:
         self.__secret = os.getenv("SECRET")
         self.__email_key = os.getenv("KEY_EMAIL")
         self.__email = os.getenv("EMAIL_USER")
+        self.__url_email = os.getenv("URL_EMAIL")
         
     def db_name(self) -> str:
         return self.__dbname
@@ -40,6 +41,9 @@ class data:
         return self.__email_key
     def email_user(self) -> str:
         return self.__email
+    
+    def url_email(self) ->str:
+        return self.__url_email
     
         
     

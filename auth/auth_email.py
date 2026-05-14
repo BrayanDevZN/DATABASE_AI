@@ -1,7 +1,5 @@
 import secrets
-import smtplib
-from email.message import EmailMessage
-from datetime import datetime, timedelta
+
 
 from sqlalchemy import text
 
@@ -9,14 +7,16 @@ from core.config import data
 from connect.manager_database import main_database
 
 
-class CreateAccountCode:
+class Auth_Create:
     def __init__(self, email: str) -> None:
         self.email = email
         self.code = ''.join(str(secrets.randbelow(10)) for _ in range(6))
         self.engine = main_database()
+        
+        
 
-        self.email_user = data().email_user()
-        self.email_pass = data().key_email()
+        
+        self.url = data().url_email()
 
     def get_code(self) -> str:
         return self.code
@@ -37,24 +37,15 @@ class CreateAccountCode:
             session.commit()
 
     def send(self) -> None:
-        import resend
-
-        resend.api_key = self.email_pass  
-
-        resend.Emails.send({
-            "from": "onboarding@resend.dev",
-            "to": self.email,
-            "subject": "Código de verificação",
-            "html": f"""
-            <p>Olá,</p>
-
-            <p>Seu código para alterar senha é:</p>
-
-            <h2>{self.cod}</h2>
-
-            <p>Se você não solicitou isso, ignore este e-mail.</p>
-            """
-        })
+        import requests
+        payload = {
+            "subject": "Código de verificação para criação de conta",
+            "email": self.email,
+            "sender": f"""Seu código de verificação é: {self.code}
+            
+            Observação:Se não foi você que enviou, nos avise!!"""
+        }
+        requests.post(url=self.url, json=payload).json()
     def execute(self) -> str:
         self.save()
         self.send()
