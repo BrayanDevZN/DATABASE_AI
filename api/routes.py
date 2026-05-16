@@ -1,4 +1,6 @@
 from fastapi import FastAPI, status
+from fastapi.middleware.cors import CORSMiddleware
+
 import api.model.model_accounts as models
 import api.model.model_conversation as conversation_models
 import app.app_accounts.manager_accounts as manager
@@ -7,6 +9,13 @@ import app.app_conversations.manager_conversation as conversation_manager
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.post("/create_user", status_code=status.HTTP_201_CREATED)
 def create_user(data: models.CreateUser):
