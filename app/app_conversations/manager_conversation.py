@@ -7,6 +7,9 @@ class ManagerConversation:
 
     def create(self, data: dict) -> dict | None:
         return self.service.create(data)
+    def create_empty(self, data: dict) -> dict | None:
+        return self.service.create_empty(data)
+
 
     def select_by_user(self, data: dict) -> list[dict]:
         return self.service.select_by_user(data)

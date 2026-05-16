@@ -90,3 +90,8 @@ def select_by_user(data: conversation_models.WithToken):
 @app.delete("/conversation", status_code=status.HTTP_200_OK)
 def delete_conversation(data: conversation_models.GetConversation):
     return conversation_manager.ManagerConversation().delete_conversation(data.model_dump())
+
+
+@app.post("/conversation/create", status_code=status.HTTP_201_CREATED)
+def create_empty_conversation(data: conversation_models.WithToken):
+    return conversation_manager.ManagerConversation().create_empty(data.model_dump())
