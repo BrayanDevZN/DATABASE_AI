@@ -95,3 +95,4 @@ def delete_conversation(data: conversation_models.GetConversation):
 @app.post("/conversation/create", status_code=status.HTTP_201_CREATED)
 def create_empty_conversation(data: conversation_models.WithToken):
     return conversation_manager.ManagerConversation().create_empty(data.model_dump())
+#a
