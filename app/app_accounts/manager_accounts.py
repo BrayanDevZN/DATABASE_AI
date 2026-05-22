@@ -2,8 +2,7 @@ from app.app_accounts.repository import RepositoryAccount
 from app.app_accounts.model import Model_user
 from app.app_accounts.service import Service
 from auth.manager_auth import Login, valid_jwt
-from auth.auth_pass import Auth_Pass
-from auth.auth_email import Auth_Create
+from auth.auth_sender import Sender_Auth
 from auth.hash import hash3
 from app.app_accounts.repository import RepositoryAccount
 from auth.jwt import JWT
@@ -14,9 +13,9 @@ class create_User:
     def env_code(self, data:dict) -> None:
         Data = Model_user(email=data["email"])
         
-        code = Auth_Create(Data.email)
-        code.execute()
-        return Data.email
+        code = Sender_Auth(content=Data.email, type="Create")()
+        
+        return "Ok"
     
     def create(self, Data: dict) -> str | None:
         user = Model_user(
@@ -65,7 +64,7 @@ class User_Login:
         if new_token["is_valid"]:
             id = JWT().get_jwt(key="user_id", token=token)
             email = JWT().get_jwt(key="email", token=token)
-            env = Auth_Pass(id=id, email=email).execute()
+            env = Sender_Auth(type="Update", content={"id": id, "email":email})()
             return True
         return False
     
