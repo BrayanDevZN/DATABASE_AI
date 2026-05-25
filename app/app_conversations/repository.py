@@ -110,7 +110,7 @@ class RepositoryConversation:
             return result.rowcount > 0
         
     def create_empty(self, user_id: int) -> int:
-        with self.app.connect() as session:
+        with self.db.connect() as session:
             result = session.execute(
                 text("""
                     SELECT COALESCE(MAX(conversation_id), 0) + 1 AS next_id
