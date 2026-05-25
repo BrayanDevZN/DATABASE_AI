@@ -39,12 +39,18 @@ def login(data: models.Login):
 
 @app.post("/env_pass", status_code=status.HTTP_200_OK)
 def env_pass(data: models.Env_CodePass):
-    return manager.User_Login().Env_codePass(data.model_dump()["token"])
+    if "email" in data.model_dump().keys():
+        return manager.User_Login().Env_codePass(email=data.model_dump()["email"]) 
+    
+    return manager.User_Login().Env_codePass(token=data.model_dump()["token"]) 
 
 
 @app.patch("/update_auth_pass", status_code=status.HTTP_200_OK)
 def update_auth_pass(data: models.UpdateAuthPass):
-    return manager.User_Login().updateAuth_Pass(data.model_dump())
+    
+    return manager.User_Login().updateAuth_Pass(email=data.model_dump()) 
+    
+    
 
 
 @app.patch("/update_pass", status_code=status.HTTP_200_OK)

@@ -28,7 +28,8 @@ class Login(BaseModel):
 class Env_CodePass(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    token: str
+    token: str | None
+    email: str | None
 
 
 class UpdateAuthPass(BaseModel):

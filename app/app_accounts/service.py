@@ -56,18 +56,16 @@ class Service:
 
         return False
     
-    def valid_code(self, token:str, code:str) -> dict:
+    def valid_code(self, email:str, code:str) -> dict:
             from sqlalchemy import text
             from connect.manager_database import main_database
             from datetime import datetime, timedelta
 
             app = main_database()
 
-            Token = valid_jwt(token).validation()
-            if not Token["is_valid"]:
-                return {"status": False, "expired": True}
-
-            user_id = self.jwt.get_jwt(key="user_id", token=token)
+             
+            data = self.app.select_by_email(email=email)
+            user_id = data["user_id"]
 
             with app.connect() as session:
                 result = session.execute(
@@ -105,7 +103,8 @@ class Service:
 
             return {
                 "status": status,
-                "expired": expired
+                "expired": expired,
+                "id": user_id
             }
                 
     def valid_createAccount_code(self, email:str, code:int) -> dict:
@@ -172,8 +171,8 @@ class Service:
         
         
                 
-    def update_AuthPass(self, Pass:str, token:str) -> None:
-        id = self.jwt.get_jwt(key="user_id", token=token)
+    def update_AuthPass(self, Pass:str, id:int) -> None:
+        
         
         self.app.update(user_id=id, password=hash3().encoder_bcr(Pass))
         

@@ -58,31 +58,45 @@ class User_Login:
             Pass = Model_user(password=data["password"]).password
             return Login(email=email, Pass=Pass).login()
         
-    def Env_codePass(self, token:str) -> bool:
+    def Env_codePass(self, token=None, email=None) -> None:
+        if token is not None:
       
-        new_token = valid_jwt(token).validation()
-        if new_token["is_valid"]:
-            id = JWT().get_jwt(key="user_id", token=token)
-            email = JWT().get_jwt(key="email", token=token)
-            env = Sender_Auth(type="Update", content={"id": id, "email":email})()
-            return True
-        return False
+            new_token = valid_jwt(token).validation()
+            if new_token["is_valid"]:
+                id = JWT().get_jwt(key="user_id", token=token)
+                email = JWT().get_jwt(key="email", token=token)
+               
+                
+            
+        elif email is not None:
+            id = RepositoryAccount().select_by_email(email=email)["user_id"]
+            email = email
+            
+        env = Sender_Auth(type="Update", content={"id": id, "email":email})()
+        
+       
     
     def updateAuth_Pass(self,data:dict) ->dict:
         code = data["code"]
-        token = Model_user(token=data["token"]).token
+        
+        if  "email" in data.keys():
+            email = data["email"]
+        else:
+            email = Model_user(token=data["token"]).token
+            email = Model_user(email=JWT().get_jwt(key="email")).email
+        
         new_pass = Model_user(password=data["password"]).password
         
-        new_token = valid_jwt(token).validation()
-        valid_code = Service().valid_code(token=token, code=code)
-        print(valid_code)
-        if new_token["is_valid"] and (valid_code["status"] and not valid_code["expired"]):
-            id = JWT().get_jwt(key="user_id", token=token)
-            user = RepositoryAccount().select(id)
+        
+        valid_code = Service().valid_code(email=email, code=code)
+        
+        if valid_code["status"] and not valid_code["expired"]:
+            
+            user = RepositoryAccount().select_by_email(email=email)
             password = user["password"]
             if hash3().check_pw(data=new_pass,  new_data=password):
                 return {"status": "equal"}
-            Service().update_AuthPass(token=token, Pass=new_pass)
+            Service().update_AuthPass(id=valid_code["id"], Pass=new_pass)
             return {"status": True}
         return {"status": False}
     
