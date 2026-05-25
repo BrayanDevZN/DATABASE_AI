@@ -48,8 +48,8 @@ class create_User:
         return None
     
     def valid_user(self, data:dict) -> bool:
-        user = Model_user(name=data["email"]).email
-        return {"exists":True} if RepositoryAccount().select_by_email(user) is not None else {"exists":False}
+        user = Model_user(email=data["email"]).email
+        return {"exists": RepositoryAccount().select_by_email(user) is not None} 
         
     
 class User_Login:
