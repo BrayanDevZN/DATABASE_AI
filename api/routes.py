@@ -41,7 +41,7 @@ def login(data: models.Login):
 def env_pass(data: models.Env_CodePass):
     
     
-    return manager.User_Login().Env_codePass(token=data.model_dump()) 
+    return manager.User_Login().Env_codePass(data=data.model_dump()) 
 
 
 @app.patch("/update_auth_pass", status_code=status.HTTP_200_OK)
