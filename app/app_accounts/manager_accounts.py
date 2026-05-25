@@ -58,7 +58,9 @@ class User_Login:
             Pass = Model_user(password=data["password"]).password
             return Login(email=email, Pass=Pass).login()
         
-    def Env_codePass(self, token=None, email=None) -> None:
+    def Env_codePass(self, data:dict) -> None:
+        token = data["token"] if "token" in data.keys() else None
+        email = data["email"] if "email" in data.keys() else None
         if token is not None:
       
             new_token = valid_jwt(token).validation()
