@@ -110,18 +110,31 @@ class RepositoryConversation:
             return result.rowcount > 0
         
     def create_empty(self, user_id: int) -> int:
-        with self.db.connect() as session:
+        with self.app.connect() as session:
             result = session.execute(
                 text("""
-                    INSERT INTO conversations (user_id)
-                    VALUES (:user_id)
-                    RETURNING conversation_id
+                    SELECT COALESCE(MAX(conversation_id), 0) + 1 AS next_id
+                    FROM conversations
+                    WHERE user_id = :user_id
                 """),
                 {"user_id": user_id}
             )
 
+            conversation_id = result.fetchone()._mapping["next_id"]
+
+            session.execute(
+                text("""
+                    INSERT INTO conversations (user_id, conversation_id, role, content)
+                    VALUES (:user_id, :conversation_id, :role, :content)
+                """),
+                {
+                    "user_id": user_id,
+                    "conversation_id": conversation_id,
+                    "role": "assistant",
+                    "content": "Nova conversa criada."
+                }
+            )
+
             session.commit()
 
-            row = result.fetchone()
-
-            return row[0]
+            return conversation_id
