@@ -108,3 +108,20 @@ class RepositoryConversation:
             )
 
             return result.rowcount > 0
+        
+    def create_empty(self, user_id: int) -> int:
+        with self.app.connect() as session:
+            result = session.execute(
+                text("""
+                    INSERT INTO conversations (user_id)
+                    VALUES (:user_id)
+                    RETURNING conversation_id
+                """),
+                {"user_id": user_id}
+            )
+
+            session.commit()
+
+            row = result.fetchone()
+
+            return row[0]
