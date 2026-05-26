@@ -60,8 +60,8 @@ class Service:
             return False
 
         if self.hash.check_pw(
-            password=new_pass,
-            hashed=password_hash
+            data=new_pass,
+            new_data=password_hash
         ):
             return False
 
