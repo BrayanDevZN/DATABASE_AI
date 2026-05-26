@@ -153,6 +153,11 @@ class User_Login:
         valid_tk = valid_jwt(token=token["token"])
         return valid_tk.validation()
     
+    def me(self, data: dict) -> dict:
+        token = data["token"]
+
+        return Service().me(token=token)
+    
     
 
             
