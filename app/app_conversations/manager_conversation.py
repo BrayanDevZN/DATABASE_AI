@@ -13,7 +13,8 @@ class ManagerConversation:
 
     def create_empty(self, data: dict) -> dict | None:
         return self.service.create_empty(
-            token=data["token"]
+            token=data["token"],
+            title=data["title"]
         )
 
     def select_by_conversation(self, data: dict) -> list[dict]:
