@@ -27,3 +27,9 @@ class ManagerConversation:
         return self.service.select_conversations(
             token=data["token"]
         )
+        
+    def delete_conversation(self, data: dict) -> bool:
+        return self.service.delete_conversation(
+            conversation_id=data["conversation_id"],
+            token=data["token"]
+        )
