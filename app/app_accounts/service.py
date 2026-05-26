@@ -54,8 +54,8 @@ class Service:
         password_hash = user["password"]
 
         if not self.hash.check_pw(
-            password=current_password,
-            hashed=password_hash
+            data=current_password,
+            new_data=password_hash
         ):
             return False
 
