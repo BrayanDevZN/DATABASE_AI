@@ -1,39 +1,21 @@
-from app.app_conversations.service import ServiceConversation
+def create(self, data: dict) -> dict | None:
+    return self.service.create(
+        data=data,
+        token=data["token"]
+    )
 
+def create_empty(self, data: dict) -> dict | None:
+    return self.service.create_empty(
+        token=data["token"]
+    )
 
-class ManagerConversation:
-    def __init__(self) -> None:
-        self.service = ServiceConversation()
+def select_by_conversation(self, data: dict) -> list[dict]:
+    return self.service.select_by_conversation(
+        conversation_id=data["conversation_id"],
+        token=data["token"]
+    )
 
-    def create(self, data: dict) -> dict | None:
-        return self.service.create(
-            data=data,
-            token=data["token"]
-        )
-
-    def create_empty(self, data: dict) -> dict | None:
-        return self.service.create_empty(
-            token=data["token"]
-        )
-
-    def select_by_user(self, data: dict) -> list[dict]:
-        return self.service.select_by_user(
-            token=data["token"]
-        )
-
-    def select_by_conversation(self, data: dict) -> list[dict]:
-        return self.service.select_by_conversation(
-            conversation_id=data["conversation_id"],
-            token=data["token"]
-        )
-
-    def select_conversations(self, data: dict) -> list[dict]:
-        return self.service.select_conversations(
-            token=data["token"]
-        )
-
-    def delete_conversation(self, data: dict) -> bool:
-        return self.service.delete_conversation(
-            conversation_id=data["conversation_id"],
-            token=data["token"]
-        )
+def select_conversations(self, data: dict) -> list[dict]:
+    return self.service.select_conversations(
+        token=data["token"]
+    )
