@@ -224,6 +224,33 @@ class Service:
 
         return True
       
+    def me(self, token: str) -> dict:
+        auth = valid_jwt(token=token).validation()
+
+        if not auth["is_valid"]:
+            return {"status": False}
+
+        user_id = self.jwt.get_jwt(key="user_id", token=token)
+
+        if user_id is None:
+            return {"status": False}
+
+        user = self.app.select(user_id=user_id)
+
+        if not user:
+            return {"status": False}
+
+        return {
+            "status": True,
+            "user": {
+                "user_id": user["user_id"],
+                "name": user["name"],
+                "email": user["email"],
+                "age": user["age"],
+                "gender": user["gender"],
+                "role": user["role"],
+            }
+        }
     
         
         
