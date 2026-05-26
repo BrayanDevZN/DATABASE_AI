@@ -34,27 +34,42 @@ class Service:
 
         return "false_pass"
 
-    def update_pass(self, token: str, valid: str, new_pass: str) -> bool:
-        if not valid_jwt(token=token).validation()["is_valid"]:
+    def update_pass(self, token: str, current_password: str, new_pass: str) -> bool:
+        auth = valid_jwt(token=token).validation()
+
+        if not auth["is_valid"]:
             return False
 
-        if valid == "none_pass":
+        user_id = self.jwt.get_jwt(key="user_id", token=token)
+
+        if user_id is None:
             return False
 
-        if valid == "true_pass":
+        user = self.app.select_by_id(user_id=user_id)
+
+        if not user:
             return False
 
-        if valid == "false_pass":
-            user_id = self.jwt.get_jwt(key="user_id", token=token)
+        password_hash = user["password"]
 
-            self.app.update(
-                user_id=user_id,
-                password=self.hash.encoder_bcr(new_pass)
-            )
+        if not self.hash.check_bcr(
+            password=current_password,
+            hashed=password_hash
+        ):
+            return False
 
-            return True
+        if self.hash.check_bcr(
+            password=new_pass,
+            hashed=password_hash
+        ):
+            return False
 
-        return False
+        self.app.update(
+            user_id=user_id,
+            password=self.hash.encoder_bcr(new_pass)
+        )
+
+        return True
     
     def valid_code(self, email:str, code:str) -> dict:
             from sqlalchemy import text

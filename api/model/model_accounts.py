@@ -37,7 +37,7 @@ class UpdateAuthPass(BaseModel):
 
     code: int
     token: str | None = None
-    email:str | None = None
+    email: str | None = None
     password: str
 
 
@@ -45,6 +45,7 @@ class Pass(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     token: str
+    current_password: str
     password: str
 
 
@@ -54,6 +55,8 @@ class UpName(BaseModel):
     token: str
     name: str
 
+
 class ValidToken(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
     token: str
