@@ -3,7 +3,7 @@ from typing import Literal, List
 from datetime import datetime
 
 
-class CreateConversation(BaseModel):
+class SaveMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     conversation_id: int = Field(gt=0)
@@ -17,9 +17,25 @@ class CreateConversation(BaseModel):
         return v
 
 
-class WithToken(BaseModel):
+class SaveMessageWithToken(SaveMessage):
+    token: str
+
+
+class CreateConversation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    token: str
+    title: str
+
+    @field_validator("title")
+    def validate_title(cls, v: str):
+        if not v.strip():
+            raise ValueError("title cannot be empty")
+        return v
+
+
+class WithToken(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     token: str
 
 
@@ -47,6 +63,7 @@ class ListMessages(BaseModel):
 
 class ConversationSummary(BaseModel):
     conversation_id: int
+    title: str
     created_at: datetime
     updated_at: datetime
     total_messages: int
@@ -54,6 +71,3 @@ class ConversationSummary(BaseModel):
 
 class ListConversations(BaseModel):
     conversations: List[ConversationSummary]
-    
-class CreateConversationWithToken(CreateConversation):
-    token: str
