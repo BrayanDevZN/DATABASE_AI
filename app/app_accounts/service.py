@@ -46,7 +46,7 @@ class Service:
         if user_id is None:
             return False
 
-        user = self.app.select_by_id(user_id=user_id)
+        user = self.app.select(user_id=user_id)
 
         if not user:
             return False
