@@ -121,16 +121,13 @@ class User_Login:
         }
 
     def update_Pass(self, data: dict) -> dict:
-        change_token = data["token"]
+        token = data["token"]
+        current_password = data["current_password"]
         new_password = Model_user(password=data["password"]).password
 
-        payload = JWT().validate_password_change_token(change_token)
-
-        if not payload["valid"]:
-            return {"status": False}
-
-        result = Service().update_pass_by_user_id(
-            user_id=payload["user_id"],
+        result = Service().update_pass(
+            token=token,
+            current_password=current_password,
             new_pass=new_password
         )
 

@@ -34,6 +34,7 @@ class Service:
 
         return "false_pass"
 
+    
     def update_pass(self, token: str, current_password: str, new_pass: str) -> bool:
         auth = valid_jwt(token=token).validation()
 

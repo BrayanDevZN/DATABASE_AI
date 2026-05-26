@@ -10,9 +10,7 @@ class hash3:
         ).decode("utf-8")
 
     def check_pw(self, data: str, new_data: str) -> bool:
-        print("DATA:", repr(data), type(data))
-        print("NEW_DATA:", repr(new_data), type(new_data))
-        print("LEN NEW_DATA:", len(new_data))
+        
 
         return bcrypt.checkpw(
             data.encode("utf-8"),
