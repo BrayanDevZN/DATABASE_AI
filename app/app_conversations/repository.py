@@ -5,20 +5,25 @@ from connect.manager_database import main_database
 class RepositoryConversation:
     def __init__(self) -> None:
         self.db = main_database()
-
-    def create_empty(self, user_id: int) -> int:
+        
+    def create_empty(self, user_id: int, title: str) -> int:
         with self.db.connect() as session:
             result = session.execute(
                 text("""
-                    INSERT INTO conversations (user_id)
-                    VALUES (:user_id)
+                    INSERT INTO conversations (user_id, title)
+                    VALUES (:user_id, :title)
                     RETURNING id
                 """),
-                {"user_id": user_id}
+                {
+                    "user_id": user_id,
+                    "title": title
+                }
             )
 
             session.commit()
+
             return result.fetchone()[0]
+
 
     def create(
         self,

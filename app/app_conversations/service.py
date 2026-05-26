@@ -68,11 +68,12 @@ class ServiceConversation:
             conversation_id=conversation_id
         )
         
-    def create_empty(self, token: str) -> dict:
+    def create_empty(self, token: str, title: str) -> dict:
         user = self._valid_token(token)
 
         conversation_id = self.repo.create_empty(
-            user_id=user["user_id"]
+            user_id=user["user_id"],
+            title=title
         )
 
         return {
