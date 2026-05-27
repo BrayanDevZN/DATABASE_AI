@@ -125,6 +125,11 @@ class User_Login:
                 return {"status": "equal"}
             Service().update_AuthPass(id=valid_code["id"], Pass=new_pass)
             return {"status": True}
+        
+        print("DATA UPDATE AUTH:", data)
+        print("EMAIL USADO:", email)
+        print("CODE USADO:", code)
+        print("VALID CODE:", valid_code)
         return {"status": False}
     
     def check_pass(self, data: dict) -> dict:

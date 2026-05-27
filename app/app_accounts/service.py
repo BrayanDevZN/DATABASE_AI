@@ -79,9 +79,19 @@ class Service:
 
         app = main_database()
 
+        print("=" * 50)
+        print("VALID_CODE INICIADO")
+        print("EMAIL RECEBIDO:", email)
+        print("CODE RECEBIDO:", code)
+
         user = self.app.select_by_email(email=email)
 
+        print("USER ENCONTRADO:", user)
+
         if not user:
+            print("USUÁRIO NÃO ENCONTRADO")
+            print("=" * 50)
+
             return {
                 "status": False,
                 "expired": False,
@@ -90,6 +100,9 @@ class Service:
 
         user_id = user["user_id"]
         code_input = str(code).strip()
+
+        print("USER_ID:", user_id)
+        print("CODE INPUT FORMATADO:", code_input)
 
         with app.connect() as session:
             result = session.execute(
@@ -109,7 +122,12 @@ class Service:
 
             row = result.fetchone()
 
+            print("ROW RETORNADA:", row)
+
             if not row:
+                print("CÓDIGO NÃO ENCONTRADO NO BANCO")
+                print("=" * 50)
+
                 return {
                     "status": False,
                     "expired": False,
@@ -119,14 +137,24 @@ class Service:
             data = row._mapping
             created_at = data["created_at"]
 
+            print("DADOS DO BANCO:", dict(data))
+            print("CREATED_AT:", created_at)
+
             expired = datetime.now() > created_at + timedelta(minutes=10)
 
+            print("HORA AGORA:", datetime.now())
+            print("EXPIRADO?:", expired)
+
             if expired:
+                print("CÓDIGO EXPIRADO, DELETANDO...")
+
                 session.execute(
                     text("DELETE FROM validation WHERE user_id = :user_id"),
                     {"user_id": user_id}
                 )
                 session.commit()
+
+                print("=" * 50)
 
                 return {
                     "status": False,
@@ -134,11 +162,16 @@ class Service:
                     "id": user_id
                 }
 
+            print("CÓDIGO VÁLIDO, DELETANDO APÓS USO...")
+
             session.execute(
                 text("DELETE FROM validation WHERE user_id = :user_id"),
                 {"user_id": user_id}
             )
             session.commit()
+
+        print("VALIDAÇÃO OK")
+        print("=" * 50)
 
         return {
             "status": True,
@@ -200,7 +233,8 @@ class Service:
                     {"validation_id": data["validation_id"]}
                 )
                 session.commit()
-
+                
+            
             return {
                 "status": status,
                 "expired": expired
