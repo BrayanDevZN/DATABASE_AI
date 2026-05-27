@@ -60,3 +60,9 @@ class ValidToken(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     token: str
+    
+class DeleteUser(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    token: str
+    password: str

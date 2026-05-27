@@ -7,6 +7,33 @@ from auth.hash import hash3
 from app.app_accounts.repository import RepositoryAccount
 from auth.jwt import JWT
 from auth.dependences import Valid
+from app.app_conversations.manager_conversation import ManagerConversation
+
+
+
+def delete_user(self, data: dict) -> dict:
+    token = data["token"]
+    password = data["password"]
+
+    check = Service().check_delete_user(
+        token=token,
+        password=password
+    )
+
+    if not check["status"]:
+        return check
+
+    ManagerConversation().delete_all_by_user(
+        user_id=check["user_id"]
+    )
+
+    deleted = Service().delete_user_by_id(
+        user_id=check["user_id"]
+    )
+
+    return {
+        "status": deleted
+    }
 
 class create_User:
     
@@ -204,6 +231,31 @@ class User_Login:
         token = data["token"]
 
         return Service().me(token=token)
+    
+    def delete_user(self, data: dict) -> dict:
+        token = data["token"]
+        password = data["password"]
+
+        check = Service().check_delete_user(
+            token=token,
+            password=password
+        )
+
+        if not check["status"]:
+            return check
+
+        ManagerConversation().delete_all_by_user(
+            user_id=check["user_id"]
+        )
+
+        deleted = Service().delete_user_by_id(
+            user_id=check["user_id"]
+        )
+
+        return {
+            "status": deleted
+        }
+        
     
     
 

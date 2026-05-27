@@ -1,6 +1,6 @@
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
-
+import app.app_conversations.manager_conversation as conversation_manager
 import api.model.model_accounts as models
 import api.model.model_conversation as conversation_models
 import app.app_accounts.manager_accounts as manager
@@ -105,3 +105,7 @@ def create_empty_conversation(data: conversation_models.CreateConversation):
 @app.post("/me", status_code=status.HTTP_200_OK)
 def me(data: models.ValidToken):
     return manager.User_Login().me(data.model_dump())
+
+@app.delete("/delete_user", status_code=status.HTTP_200_OK)
+def delete_user(data: models.DeleteUser):
+    return manager.User_Login().delete_user(data.model_dump())

@@ -33,3 +33,6 @@ class ManagerConversation:
             conversation_id=data["conversation_id"],
             token=data["token"]
         )
+        
+    def delete_all_by_user(self, user_id: int) -> bool:
+        return self.service.delete_all_by_user(user_id=user_id)

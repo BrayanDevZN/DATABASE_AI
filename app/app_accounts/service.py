@@ -298,10 +298,50 @@ class Service:
                 "role": user["role"],
             }
         }
-    
-        
-        
-        
+    def check_delete_user(self, token: str, password: str) -> dict:
+        auth = valid_jwt(token=token).validation()
+
+        if not auth["is_valid"]:
+            return {
+                "status": False,
+                "message": "Token inválido."
+            }
+
+        user_id = self.jwt.get_jwt(
+            key="user_id",
+            token=token
+        )
+
+        if user_id is None:
+            return {
+                "status": False,
+                "message": "Usuário inválido."
+            }
+
+        user = self.app.select(user_id=user_id)
+
+        if not user:
+            return {
+                "status": False,
+                "message": "Usuário não encontrado."
+            }
+
+        password_hash = user["password"]
+
+        if not self.hash.check_pw(password, password_hash):
+            return {
+                "status": False,
+                "message": "Senha incorreta."
+            }
+
+        return {
+            "status": True,
+            "user_id": user_id
+        }
+
+
+    def delete_user_by_id(self, user_id: int) -> bool:
+        return self.app.delete(user_id=user_id)
     
         
     

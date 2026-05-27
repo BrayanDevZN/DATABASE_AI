@@ -79,3 +79,6 @@ class ServiceConversation:
         return {
             "conversation_id": conversation_id
         }
+        
+    def delete_all_by_user(self, user_id: int) -> bool:
+        return self.repo.delete_all_by_user(user_id=user_id)
