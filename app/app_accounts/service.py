@@ -72,56 +72,66 @@ class Service:
 
         return True
     
-    def valid_code(self, email:str, code:str) -> dict:
-            from sqlalchemy import text
-            from connect.manager_database import main_database
-            from datetime import datetime, timedelta
+    def valid_code(self, email: str, code: str) -> dict:
+        from sqlalchemy import text
+        from connect.manager_database import main_database
+        from datetime import datetime, timedelta
 
-            app = main_database()
+        app = main_database()
 
-             
-            data = self.app.select_by_email(email=email)
-            user_id = data["user_id"]
+        user = self.app.select_by_email(email=email)
 
-            with app.connect() as session:
-                result = session.execute(
-                    text("""
-                        SELECT number, created_at
-                        FROM validation
-                        WHERE user_id = :user_id
-                        ORDER BY created_at DESC
-                        LIMIT 1
-                    """),
+        if not user:
+            return {
+                "status": False,
+                "expired": True,
+                "id": None
+            }
+
+        user_id = user["user_id"]
+
+        with app.connect() as session:
+            result = session.execute(
+                text("""
+                    SELECT number, created_at
+                    FROM validation
+                    WHERE user_id = :user_id
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """),
+                {"user_id": user_id}
+            )
+
+            row = result.fetchone()
+
+            if not row:
+                return {
+                    "status": False,
+                    "expired": True,
+                    "id": None
+                }
+
+            data = row._mapping
+
+            code_db = str(data["number"]).strip()
+            code_input = str(code).strip()
+            created_at = data["created_at"]
+
+            status = code_db == code_input
+            expired = datetime.now() > created_at + timedelta(minutes=10)
+
+            if status or expired:
+                session.execute(
+                    text("DELETE FROM validation WHERE user_id = :user_id"),
                     {"user_id": user_id}
                 )
+                session.commit()
 
-                row = result.fetchone()
-
-                if not row:
-                    return {"status": False, "expired": True}
-
-                data = row._mapping
-
-                code_db = str(data["number"]).strip()
-                code_input = str(code).strip()
-                created_at = data["created_at"]
-
-                status = code_db == code_input
-                expired = datetime.now() > created_at + timedelta(minutes=10)
-
-                
-                if status or expired:
-                    session.execute(
-                        text("DELETE FROM validation WHERE user_id = :user_id"),
-                        {"user_id": user_id}
-                    )
-                    session.commit()
-
-            return {
-                "status": status,
-                "expired": expired,
-                "id": user_id
-            }
+        return {
+            "status": status,
+            "expired": expired,
+            "id": user_id
+        }
                 
     def valid_createAccount_code(self, email:str, code:int) -> dict:
         from sqlalchemy import text
