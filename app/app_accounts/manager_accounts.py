@@ -85,7 +85,7 @@ class User_Login:
             email = data["email"]
         else:
             email = Model_user(token=data["token"]).token
-            email = Model_user(email=JWT().get_jwt(key="email")).email
+            email = Model_user(email=JWT().get_jwt(key="email", token=data["email"])).email
         
         new_pass = Model_user(password=data["password"]).password
         
