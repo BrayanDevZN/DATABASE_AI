@@ -103,33 +103,50 @@ class User_Login:
         
        
     
-    def updateAuth_Pass(self,data:dict) ->dict:
+    def updateAuth_Pass(self, data: dict) -> dict:
         code = data["code"]
-        
-        if  "email" in data.keys():
-            email = data["email"]
-        else:
-            email = Model_user(token=data["token"]).token
-            email = Model_user(email=JWT().get_jwt(key="email", token=data["email"])).email
-        
-        new_pass = Model_user(password=data["password"]).password
-        
-        
-        valid_code = Service().valid_code(email=email, code=code)
-        
+
+        email = data.get("email")
+        token = data.get("token")
+
+        if not email and token:
+            email = JWT().get_jwt(
+                key="email",
+                token=token
+            )
+
+        if not email:
+            return {"status": False}
+
+        new_pass = Model_user(
+            password=data["password"]
+        ).password
+
+        valid_code = Service().valid_code(
+            email=email,
+            code=code
+        )
+
         if valid_code["status"] and not valid_code["expired"]:
-            
-            user = RepositoryAccount().select_by_email(email=email)
+            user = RepositoryAccount().select_by_email(
+                email=email
+            )
+
             password = user["password"]
-            if hash3().check_pw(data=new_pass,  new_data=password):
+
+            if hash3().check_pw(
+                data=new_pass,
+                new_data=password
+            ):
                 return {"status": "equal"}
-            Service().update_AuthPass(id=valid_code["id"], Pass=new_pass)
+
+            Service().update_AuthPass(
+                id=valid_code["id"],
+                Pass=new_pass
+            )
+
             return {"status": True}
-        
-        print("DATA UPDATE AUTH:", data)
-        print("EMAIL USADO:", email)
-        print("CODE USADO:", code)
-        print("VALID CODE:", valid_code)
+
         return {"status": False}
     
     def check_pass(self, data: dict) -> dict:
