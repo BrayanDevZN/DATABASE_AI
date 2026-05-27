@@ -58,23 +58,48 @@ class User_Login:
             Pass = Model_user(password=data["password"]).password
             return Login(email=email, Pass=Pass).login()
         
-    def Env_codePass(self, data:dict) -> None:
-        token = data["token"] if "token" in data.keys() else None
-        email = data["email"] if "email" in data.keys() else None
-        if token is not None:
-      
-            new_token = valid_jwt(token).validation()
-            if new_token["is_valid"]:
-                id = JWT().get_jwt(key="user_id", token=token)
-                email = JWT().get_jwt(key="email", token=token)
-               
-                
-            
-        elif email is not None:
-            id = RepositoryAccount().select_by_email(email=email)["user_id"]
-            email = email
-            
-        env = Sender_Auth(type="Update", content={"id": id, "email":email})()
+    def Env_codePass(self, data: dict) -> dict:
+        token = data.get("token")
+        email = data.get("email")
+
+        user_id = None
+
+        if token:
+            new_token = valid_jwt(token=token).validation()
+
+            if not new_token["is_valid"]:
+                return {"status": False}
+
+            user_id = JWT().get_jwt(key="user_id", token=token)
+            email = JWT().get_jwt(key="email", token=token)
+
+        elif email:
+            user = RepositoryAccount().select_by_email(email=email)
+
+            if not user:
+                return {"status": False}
+
+            user_id = user["user_id"]
+            email = user["email"]
+
+        else:
+            return {"status": False}
+
+        if not user_id or not email:
+            return {"status": False}
+
+        Sender_Auth(
+            type="Update",
+            content={
+                "id": user_id,
+                "email": email
+            }
+        )()
+
+        return {
+            "status": True,
+            "email": email
+        }
         
        
     

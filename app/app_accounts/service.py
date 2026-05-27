@@ -84,11 +84,12 @@ class Service:
         if not user:
             return {
                 "status": False,
-                "expired": True,
+                "expired": False,
                 "id": None
             }
 
         user_id = user["user_id"]
+        code_input = str(code).strip()
 
         with app.connect() as session:
             result = session.execute(
@@ -96,10 +97,14 @@ class Service:
                     SELECT number, created_at
                     FROM validation
                     WHERE user_id = :user_id
+                    AND CAST(number AS TEXT) = :code
                     ORDER BY created_at DESC
                     LIMIT 1
                 """),
-                {"user_id": user_id}
+                {
+                    "user_id": user_id,
+                    "code": code_input
+                }
             )
 
             row = result.fetchone()
@@ -107,29 +112,37 @@ class Service:
             if not row:
                 return {
                     "status": False,
-                    "expired": True,
-                    "id": None
+                    "expired": False,
+                    "id": user_id
                 }
 
             data = row._mapping
-
-            code_db = str(data["number"]).strip()
-            code_input = str(code).strip()
             created_at = data["created_at"]
 
-            status = code_db == code_input
             expired = datetime.now() > created_at + timedelta(minutes=10)
 
-            if status or expired:
+            if expired:
                 session.execute(
                     text("DELETE FROM validation WHERE user_id = :user_id"),
                     {"user_id": user_id}
                 )
                 session.commit()
 
+                return {
+                    "status": False,
+                    "expired": True,
+                    "id": user_id
+                }
+
+            session.execute(
+                text("DELETE FROM validation WHERE user_id = :user_id"),
+                {"user_id": user_id}
+            )
+            session.commit()
+
         return {
-            "status": status,
-            "expired": expired,
+            "status": True,
+            "expired": False,
             "id": user_id
         }
                 
