@@ -119,6 +119,7 @@ def create_empty_conversation(data: conversation_models.CreateConversation):
 
 
 # DASHBOARDS
+# DASHBOARDS
 
 @app.post("/dashboards", status_code=status.HTTP_200_OK)
 def select_dashboards(data: chart_models.WithToken):
@@ -183,6 +184,41 @@ def create_dashboard_chart(data: chart_models.CreateChart):
 
     return {
         "chart": chart
+    }
+
+
+@app.post("/dashboard/chart/settings", status_code=status.HTTP_200_OK)
+def save_chart_settings(data: chart_models.SaveChartSettings):
+    user_id = JWT().get_jwt(
+        key="user_id",
+        token=data.token
+    )
+
+    dashboard = charts_manager.ManagerCharts().select_dashboard_with_charts(
+        user_id=user_id,
+        dashboard_id=data.dashboard_id
+    )
+
+    if not dashboard:
+        return {
+            "status": False,
+            "message": "Dashboard não encontrado ou não pertence ao usuário."
+        }
+
+    settings = charts_manager.ManagerCharts().save_chart_settings(
+        dashboard_id=data.dashboard_id,
+        chart_color=data.chart_color,
+        chart_background=data.chart_background,
+        x_axis_text_color=data.x_axis_text_color,
+        y_axis_text_color=data.y_axis_text_color,
+        grid_color=data.grid_color,
+        grid_style=data.grid_style,
+        bar_style=data.bar_style
+    )
+
+    return {
+        "status": True,
+        "settings": settings
     }
 
 

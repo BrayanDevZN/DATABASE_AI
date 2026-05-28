@@ -171,3 +171,83 @@ class RepositoryCharts:
             session.commit()
 
         return result.rowcount >= 0
+    
+    def upsert_chart_settings(
+            self,
+            dashboard_id: int,
+            chart_color: str,
+            chart_background: str,
+            x_axis_text_color: str,
+            y_axis_text_color: str,
+            grid_color: str,
+            grid_style: str,
+            bar_style: str
+        ) -> dict | None:
+            with self.db.connect() as session:
+                result = session.execute(
+                    text("""
+                        INSERT INTO dashboard_chart_settings (
+                            dashboard_id,
+                            chart_color,
+                            chart_background,
+                            x_axis_text_color,
+                            y_axis_text_color,
+                            grid_color,
+                            grid_style,
+                            bar_style,
+                            updated_at
+                        )
+                        VALUES (
+                            :dashboard_id,
+                            :chart_color,
+                            :chart_background,
+                            :x_axis_text_color,
+                            :y_axis_text_color,
+                            :grid_color,
+                            :grid_style,
+                            :bar_style,
+                            NOW()
+                        )
+                        ON CONFLICT (dashboard_id)
+                        DO UPDATE SET
+                            chart_color = EXCLUDED.chart_color,
+                            chart_background = EXCLUDED.chart_background,
+                            x_axis_text_color = EXCLUDED.x_axis_text_color,
+                            y_axis_text_color = EXCLUDED.y_axis_text_color,
+                            grid_color = EXCLUDED.grid_color,
+                            grid_style = EXCLUDED.grid_style,
+                            bar_style = EXCLUDED.bar_style,
+                            updated_at = NOW()
+                        RETURNING *
+                    """),
+                    {
+                        "dashboard_id": dashboard_id,
+                        "chart_color": chart_color,
+                        "chart_background": chart_background,
+                        "x_axis_text_color": x_axis_text_color,
+                        "y_axis_text_color": y_axis_text_color,
+                        "grid_color": grid_color,
+                        "grid_style": grid_style,
+                        "bar_style": bar_style
+                    }
+                )
+
+                session.commit()
+                settings = result.fetchone()
+
+            return dict(settings._mapping) if settings else None
+
+    def select_chart_settings(self, dashboard_id: int) -> dict | None:
+        with self.db.connect() as session:
+            result = session.execute(
+                text("""
+                    SELECT *
+                    FROM dashboard_chart_settings
+                    WHERE dashboard_id = :dashboard_id
+                """),
+                {"dashboard_id": dashboard_id}
+            )
+
+            settings = result.fetchone()
+
+        return dict(settings._mapping) if settings else None

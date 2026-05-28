@@ -37,8 +37,32 @@ class ManagerCharts:
             chart_config=chart_config
         )
 
+    def save_chart_settings(
+        self,
+        dashboard_id: int,
+        chart_color: str,
+        chart_background: str,
+        x_axis_text_color: str,
+        y_axis_text_color: str,
+        grid_color: str,
+        grid_style: str,
+        bar_style: str
+    ) -> dict | None:
+        return self.service.save_chart_settings(
+            dashboard_id=dashboard_id,
+            chart_color=chart_color,
+            chart_background=chart_background,
+            x_axis_text_color=x_axis_text_color,
+            y_axis_text_color=y_axis_text_color,
+            grid_color=grid_color,
+            grid_style=grid_style,
+            bar_style=bar_style
+        )
+
     def select_dashboards_by_user(self, user_id: int) -> list[dict]:
-        return self.service.select_dashboards_by_user(user_id=user_id)
+        return self.service.select_dashboards_by_user(
+            user_id=user_id
+        )
 
     def select_dashboard_with_charts(
         self,
@@ -50,11 +74,17 @@ class ManagerCharts:
             dashboard_id=dashboard_id
         )
 
-    def delete_dashboard(self, user_id: int, dashboard_id: int) -> bool:
+    def delete_dashboard(
+        self,
+        user_id: int,
+        dashboard_id: int
+    ) -> bool:
         return self.service.delete_dashboard(
             user_id=user_id,
             dashboard_id=dashboard_id
         )
 
     def delete_all_by_user(self, user_id: int) -> bool:
-        return self.service.delete_all_by_user(user_id=user_id)
+        return self.service.delete_all_by_user(
+            user_id=user_id
+        )
