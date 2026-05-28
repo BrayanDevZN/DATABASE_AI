@@ -140,10 +140,16 @@ class RepositoryConversation:
 
     def delete_conversation(self, user_id: int, conversation_id: int) -> bool:
         with self.db.connect() as session:
-            session.execute(text(
-                
-                
-            ))
+            session.execute(
+                text("""
+                    DELETE FROM messages
+                    WHERE conversation_id = :conversation_id
+                """),
+                {
+                    "conversation_id": conversation_id
+                }
+            )
+
             result = session.execute(
                 text("""
                     DELETE FROM conversations
@@ -155,11 +161,10 @@ class RepositoryConversation:
                     "user_id": user_id,
                 }
             )
-            
-            
 
             session.commit()
-            return result.rowcount > 0
+
+        return result.rowcount > 0
         
     def delete_all_by_user(self, user_id: int) -> bool:
         with self.db.connect() as session:
