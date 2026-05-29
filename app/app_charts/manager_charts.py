@@ -40,6 +40,7 @@ class ManagerCharts:
     def save_chart_settings(
         self,
         dashboard_id: int,
+        chart_id: int | None,
         chart_color: str,
         chart_background: str,
         x_axis_text_color: str,
@@ -50,6 +51,7 @@ class ManagerCharts:
     ) -> dict | None:
         return self.service.save_chart_settings(
             dashboard_id=dashboard_id,
+            chart_id=chart_id,
             chart_color=chart_color,
             chart_background=chart_background,
             x_axis_text_color=x_axis_text_color,

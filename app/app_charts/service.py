@@ -40,6 +40,7 @@ class ServiceCharts:
     def save_chart_settings(
         self,
         dashboard_id: int,
+        chart_id: int | None,
         chart_color: str,
         chart_background: str,
         x_axis_text_color: str,
@@ -50,6 +51,7 @@ class ServiceCharts:
     ) -> dict | None:
         return self.repo.save_chart_settings(
             dashboard_id=dashboard_id,
+            chart_id=chart_id,
             chart_color=chart_color,
             chart_background=chart_background,
             x_axis_text_color=x_axis_text_color,
@@ -84,12 +86,25 @@ class ServiceCharts:
             dashboard_id=dashboard_id
         )
 
-        settings = self.repo.select_chart_settings(
-            dashboard_id=dashboard_id
+        dashboard_settings = self.repo.select_chart_settings(
+            dashboard_id=dashboard_id,
+            chart_id=None
         )
 
-        dashboard["charts"] = charts
-        dashboard["chart_settings"] = settings or {}
+        charts_with_settings = []
+
+        for chart in charts:
+            chart_settings = self.repo.select_chart_settings(
+                dashboard_id=dashboard_id,
+                chart_id=chart["id"]
+            )
+
+            chart["chart_settings"] = chart_settings or dashboard_settings or {}
+
+            charts_with_settings.append(chart)
+
+        dashboard["charts"] = charts_with_settings
+        dashboard["chart_settings"] = dashboard_settings or {}
 
         return dashboard
 

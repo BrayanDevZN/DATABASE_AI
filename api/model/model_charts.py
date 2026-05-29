@@ -56,6 +56,10 @@ class SaveChartSettings(BaseModel):
     token: str = Field(min_length=1)
     dashboard_id: int = Field(gt=0)
 
+    # Agora pode salvar configuração de um gráfico específico.
+    # Se vier None, mantém compatibilidade com configuração geral do dashboard.
+    chart_id: int | None = Field(default=None, gt=0)
+
     chart_color: str = "#4f46e5"
     chart_background: str = "#f8fafc"
 
@@ -84,11 +88,13 @@ class ChartResponse(BaseModel):
     title: str
     chart_data: dict[str, Any]
     chart_config: dict[str, Any] | None = None
+    chart_settings: dict[str, Any] | None = None
 
 
 class ChartSettingsResponse(BaseModel):
     id: int | None = None
     dashboard_id: int | None = None
+    chart_id: int | None = None
 
     chart_color: str = "#4f46e5"
     chart_background: str = "#f8fafc"
