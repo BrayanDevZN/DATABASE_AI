@@ -235,7 +235,7 @@ class RepositoryCharts:
                     "grid_color": grid_color,
                     "grid_style": grid_style,
                     "bar_style": bar_style
-                }
+                }#
             )
 
             session.commit()
