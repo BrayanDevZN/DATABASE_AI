@@ -205,8 +205,21 @@ def save_chart_settings(data: chart_models.SaveChartSettings):
             "message": "Dashboard não encontrado ou não pertence ao usuário."
         }
 
+    if data.chart_id:
+        chart_ids = [
+            chart["id"]
+            for chart in dashboard.get("charts", [])
+        ]
+
+        if data.chart_id not in chart_ids:
+            return {
+                "status": False,
+                "message": "Gráfico não encontrado ou não pertence ao dashboard."
+            }
+
     settings = charts_manager.ManagerCharts().save_chart_settings(
         dashboard_id=data.dashboard_id,
+        chart_id=data.chart_id,
         chart_color=data.chart_color,
         chart_background=data.chart_background,
         x_axis_text_color=data.x_axis_text_color,
