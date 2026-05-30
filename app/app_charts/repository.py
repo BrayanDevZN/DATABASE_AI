@@ -184,8 +184,15 @@ class RepositoryCharts:
         y_axis_text_color: str,
         grid_color: str,
         grid_style: str,
-        bar_style: str
+        bar_style: str,
+        pie_colors: list[str] | None = None,
+        show_legend: bool = True
     ) -> dict | None:
+        pie_colors_json = json.dumps(
+            pie_colors or [],
+            ensure_ascii=False
+        )
+
         with self.db.connect() as session:
             result = session.execute(
                 text("""
@@ -199,6 +206,8 @@ class RepositoryCharts:
                         grid_color,
                         grid_style,
                         bar_style,
+                        pie_colors,
+                        show_legend,
                         updated_at
                     )
                     VALUES (
@@ -211,6 +220,8 @@ class RepositoryCharts:
                         :grid_color,
                         :grid_style,
                         :bar_style,
+                        CAST(:pie_colors AS JSONB),
+                        :show_legend,
                         NOW()
                     )
                     ON CONFLICT (chart_id)
@@ -222,6 +233,8 @@ class RepositoryCharts:
                         grid_color = EXCLUDED.grid_color,
                         grid_style = EXCLUDED.grid_style,
                         bar_style = EXCLUDED.bar_style,
+                        pie_colors = EXCLUDED.pie_colors,
+                        show_legend = EXCLUDED.show_legend,
                         updated_at = NOW()
                     RETURNING *
                 """),
@@ -234,8 +247,10 @@ class RepositoryCharts:
                     "y_axis_text_color": y_axis_text_color,
                     "grid_color": grid_color,
                     "grid_style": grid_style,
-                    "bar_style": bar_style
-                }#
+                    "bar_style": bar_style,
+                    "pie_colors": pie_colors_json,
+                    "show_legend": show_legend
+                }
             )
 
             session.commit()
@@ -275,4 +290,12 @@ class RepositoryCharts:
 
             settings = result.fetchone()
 
-        return dict(settings._mapping) if settings else None
+        if not settings:
+            return None
+
+        settings_dict = dict(settings._mapping)
+
+        if settings_dict.get("pie_colors") is None:
+            settings_dict["pie_colors"] = []
+
+        return settings_dict

@@ -226,7 +226,9 @@ def save_chart_settings(data: chart_models.SaveChartSettings):
         y_axis_text_color=data.y_axis_text_color,
         grid_color=data.grid_color,
         grid_style=data.grid_style,
-        bar_style=data.bar_style
+        bar_style=data.bar_style,
+        pie_colors=data.pie_colors,
+        show_legend=data.show_legend
     )
 
     return {

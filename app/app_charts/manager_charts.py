@@ -47,7 +47,9 @@ class ManagerCharts:
         y_axis_text_color: str,
         grid_color: str,
         grid_style: str,
-        bar_style: str
+        bar_style: str,
+        pie_colors: list[str] | None = None,
+        show_legend: bool = True
     ) -> dict | None:
         return self.service.save_chart_settings(
             dashboard_id=dashboard_id,
@@ -58,7 +60,9 @@ class ManagerCharts:
             y_axis_text_color=y_axis_text_color,
             grid_color=grid_color,
             grid_style=grid_style,
-            bar_style=bar_style
+            bar_style=bar_style,
+            pie_colors=pie_colors,
+            show_legend=show_legend
         )
 
     def select_dashboards_by_user(self, user_id: int) -> list[dict]:

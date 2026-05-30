@@ -36,6 +36,7 @@ class CreateDashboard(BaseModel):
     token: str = Field(min_length=1)
     title: str = Field(min_length=1)
     prompt: str = Field(min_length=1)
+
     ai_suggestion: str | None = None
     file_name: str | None = None
 
@@ -44,8 +45,10 @@ class CreateChart(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     dashboard_id: int = Field(gt=0)
+
     chart_type: str = Field(min_length=1)
     title: str = Field(min_length=1)
+
     chart_data: dict[str, Any]
     chart_config: dict[str, Any] | None = None
 
@@ -56,8 +59,6 @@ class SaveChartSettings(BaseModel):
     token: str = Field(min_length=1)
     dashboard_id: int = Field(gt=0)
 
-    # Agora pode salvar configuração de um gráfico específico.
-    # Se vier None, mantém compatibilidade com configuração geral do dashboard.
     chart_id: int | None = Field(default=None, gt=0)
 
     chart_color: str = "#4f46e5"
@@ -71,28 +72,52 @@ class SaveChartSettings(BaseModel):
 
     bar_style: str = "rounded"
 
+    # NOVOS CAMPOS
+
+    show_legend: bool = True
+
+    pie_colors: list[str] = Field(
+        default_factory=lambda: [
+            "#4f46e5",
+            "#06b6d4",
+            "#10b981",
+            "#f59e0b",
+            "#ef4444",
+            "#8b5cf6",
+            "#ec4899",
+            "#84cc16",
+        ]
+    )
+
 
 class DashboardResponse(BaseModel):
     id: int
     user_id: int
+
     title: str
     prompt: str
+
     ai_suggestion: str | None = None
     file_name: str | None = None
 
 
 class ChartResponse(BaseModel):
     id: int
+
     dashboard_id: int
+
     chart_type: str
     title: str
+
     chart_data: dict[str, Any]
+
     chart_config: dict[str, Any] | None = None
     chart_settings: dict[str, Any] | None = None
 
 
 class ChartSettingsResponse(BaseModel):
     id: int | None = None
+
     dashboard_id: int | None = None
     chart_id: int | None = None
 
@@ -107,9 +132,27 @@ class ChartSettingsResponse(BaseModel):
 
     bar_style: str = "rounded"
 
+    # NOVOS CAMPOS
+
+    show_legend: bool = True
+
+    pie_colors: list[str] = Field(
+        default_factory=lambda: [
+            "#4f46e5",
+            "#06b6d4",
+            "#10b981",
+            "#f59e0b",
+            "#ef4444",
+            "#8b5cf6",
+            "#ec4899",
+            "#84cc16",
+        ]
+    )
+
 
 class DashboardWithChartsResponse(DashboardResponse):
     charts: list[ChartResponse] = Field(default_factory=list)
+
     chart_settings: ChartSettingsResponse | dict[str, Any] = Field(
         default_factory=dict
     )
