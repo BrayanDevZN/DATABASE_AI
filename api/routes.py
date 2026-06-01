@@ -1,13 +1,18 @@
-from fastapi import FastAPI, status
+import io
+import pandas as pd
+
+from fastapi import FastAPI, File, Form, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 
 import api.model.model_accounts as models
 import api.model.model_conversation as conversation_models
 import api.model.model_charts as chart_models
+import api.model.model_data_source as data_source_models
 
 import app.app_accounts.manager_accounts as manager
 import app.app_conversations.manager_conversation as conversation_manager
 import app.app_charts.manager_charts as charts_manager
+import app.app_data_sources.manager_data_sources as data_source_manager
 
 from auth.jwt import JWT
 
@@ -21,6 +26,32 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def read_uploaded_file(file: UploadFile) -> tuple[list[dict], int, int]:
+    content = file.file.read()
+    filename = file.filename.lower()
+
+    if filename.endswith(".csv"):
+        df = pd.read_csv(io.BytesIO(content))
+
+    elif filename.endswith(".xlsx") or filename.endswith(".xls"):
+        df = pd.read_excel(io.BytesIO(content))
+
+    elif filename.endswith(".json"):
+        df = pd.read_json(io.BytesIO(content))
+
+    else:
+        raise ValueError("Formato inválido. Envie CSV, XLSX, XLS ou JSON.")
+
+    df = df.dropna(how="all")
+    df = df.where(pd.notnull(df), None)
+
+    file_data = df.to_dict(orient="records")
+    row_count = len(df)
+    column_count = len(df.columns)
+
+    return file_data, row_count, column_count
 
 
 @app.post("/create_user", status_code=status.HTTP_201_CREATED)
@@ -78,19 +109,18 @@ def me(data: models.ValidToken):
     return manager.User_Login().me(data.model_dump())
 
 
-# SALVAR MENSAGEM
 @app.post("/conversation", status_code=status.HTTP_201_CREATED)
 def create_conversation(data: conversation_models.SaveMessageWithToken):
     return conversation_manager.ManagerConversation().create(data.model_dump())
 
 
-# LISTAR CHATS
 @app.post("/conversations", status_code=status.HTTP_200_OK)
 def select_conversations(data: conversation_models.WithToken):
-    return conversation_manager.ManagerConversation().select_conversations(data.model_dump())
+    return conversation_manager.ManagerConversation().select_conversations(
+        data.model_dump()
+    )
 
 
-# PEGAR MENSAGENS DE UM CHAT
 @app.post("/conversation/messages", status_code=status.HTTP_200_OK)
 def select_by_conversation(data: conversation_models.GetConversation):
     return conversation_manager.ManagerConversation().select_by_conversation(
@@ -112,13 +142,134 @@ def delete_conversation(data: conversation_models.GetConversation):
     )
 
 
-# CRIAR CHAT VAZIO
 @app.post("/conversation/create", status_code=status.HTTP_201_CREATED)
 def create_empty_conversation(data: conversation_models.CreateConversation):
-    return conversation_manager.ManagerConversation().create_empty(data.model_dump())
+    return conversation_manager.ManagerConversation().create_empty(
+        data.model_dump()
+    )
 
 
-# DASHBOARDS
+# DATA SOURCES
+
+@app.post("/data-source/create", status_code=status.HTTP_201_CREATED)
+def create_data_source(
+    token: str = Form(...),
+    name: str = Form(...),
+    file: UploadFile = File(...)
+):
+    user_id = JWT().get_jwt(
+        key="user_id",
+        token=token
+    )
+
+    file_data, row_count, column_count = read_uploaded_file(file)
+
+    data_source = data_source_manager.ManagerDataSources().create_data_source(
+        user_id=user_id,
+        name=name,
+        file_name=file.filename,
+        file_data=file_data,
+        row_count=row_count,
+        column_count=column_count
+    )
+
+    return {
+        "data_source": data_source
+    }
+
+
+@app.post("/data-sources", status_code=status.HTTP_200_OK)
+def select_data_sources(data: data_source_models.WithToken):
+    user_id = JWT().get_jwt(
+        key="user_id",
+        token=data.token
+    )
+
+    return {
+        "data_sources": data_source_manager.ManagerDataSources()
+        .select_data_sources_by_user(user_id=user_id)
+    }
+
+
+@app.post("/data-source", status_code=status.HTTP_200_OK)
+def select_data_source(data: data_source_models.GetDataSource):
+    user_id = JWT().get_jwt(
+        key="user_id",
+        token=data.token
+    )
+
+    data_source = data_source_manager.ManagerDataSources().select_data_source(
+        user_id=user_id,
+        data_source_id=data.data_source_id
+    )
+
+    return {
+        "data_source": data_source
+    }
+
+
+@app.patch("/data-source/update", status_code=status.HTTP_200_OK)
+def update_data_source(
+    token: str = Form(...),
+    data_source_id: int = Form(...),
+    file: UploadFile = File(...)
+):
+    user_id = JWT().get_jwt(
+        key="user_id",
+        token=token
+    )
+
+    file_data, row_count, column_count = read_uploaded_file(file)
+
+    data_source = data_source_manager.ManagerDataSources().update_data_source(
+        user_id=user_id,
+        data_source_id=data_source_id,
+        file_name=file.filename,
+        file_data=file_data,
+        row_count=row_count,
+        column_count=column_count
+    )
+
+    return {
+        "data_source": data_source
+    }
+
+
+@app.patch("/data-source/rename", status_code=status.HTTP_200_OK)
+def rename_data_source(data: data_source_models.RenameDataSource):
+    user_id = JWT().get_jwt(
+        key="user_id",
+        token=data.token
+    )
+
+    data_source = data_source_manager.ManagerDataSources().rename_data_source(
+        user_id=user_id,
+        data_source_id=data.data_source_id,
+        name=data.name
+    )
+
+    return {
+        "data_source": data_source
+    }
+
+
+@app.delete("/data-source", status_code=status.HTTP_200_OK)
+def delete_data_source(data: data_source_models.DeleteDataSource):
+    user_id = JWT().get_jwt(
+        key="user_id",
+        token=data.token
+    )
+
+    deleted = data_source_manager.ManagerDataSources().delete_data_source(
+        user_id=user_id,
+        data_source_id=data.data_source_id
+    )
+
+    return {
+        "status": deleted
+    }
+
+
 # DASHBOARDS
 
 @app.post("/dashboards", status_code=status.HTTP_200_OK)
@@ -263,6 +414,10 @@ def delete_user(data: models.DeleteUser):
 
     if user_id is not None:
         charts_manager.ManagerCharts().delete_all_by_user(
+            user_id=user_id
+        )
+
+        data_source_manager.ManagerDataSources().delete_all_by_user(
             user_id=user_id
         )
 
