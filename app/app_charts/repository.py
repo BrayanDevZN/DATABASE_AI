@@ -305,3 +305,137 @@ class RepositoryCharts:
             settings_dict["pie_colors"] = []
 
         return settings_dict
+    
+    
+    def select_dashboards_by_data_source(
+        self,
+        user_id: int,
+        data_source_id: int
+    ) -> list[dict]:
+
+        with self.db.connect() as session:
+            result = session.execute(
+                text("""
+                    SELECT *
+                    FROM dashboards
+                    WHERE user_id = :user_id
+                    AND data_source_id = :data_source_id
+                    ORDER BY updated_at DESC
+                """),
+                {
+                    "user_id": user_id,
+                    "data_source_id": data_source_id
+                }
+            )
+
+            dashboards = result.fetchall()
+
+        return [
+            dict(dashboard._mapping)
+            for dashboard in dashboards
+        ]
+        
+    def mark_dashboards_outdated(
+        self,
+        data_source_id: int
+    ) -> bool:
+
+        with self.db.connect() as session:
+            result = session.execute(
+                text("""
+                    UPDATE dashboards
+                    SET
+                        is_outdated = TRUE,
+                        updated_at = NOW()
+                    WHERE data_source_id = :data_source_id
+                """),
+                {
+                    "data_source_id": data_source_id
+                }
+            )
+
+            session.commit()
+
+        return result.rowcount > 0
+    
+    
+    def delete_charts_by_dashboard(
+        self,
+        dashboard_id: int
+    ) -> bool:
+
+        with self.db.connect() as session:
+            result = session.execute(
+                text("""
+                    DELETE
+                    FROM dashboard_charts
+                    WHERE dashboard_id = :dashboard_id
+                """),
+                {
+                    "dashboard_id": dashboard_id
+                }
+            )
+
+            session.commit()
+
+        return result.rowcount >= 0
+    
+    
+    def update_dashboard_after_refresh(
+        self,
+        user_id: int,
+        dashboard_id: int,
+        ai_suggestion: str
+    ) -> dict | None:
+
+        with self.db.connect() as session:
+            result = session.execute(
+                text("""
+                    UPDATE dashboards
+                    SET
+                        ai_suggestion = :ai_suggestion,
+                        is_outdated = FALSE,
+                        updated_at = NOW()
+                    WHERE id = :dashboard_id
+                    AND user_id = :user_id
+                    RETURNING *
+                """),
+                {
+                    "user_id": user_id,
+                    "dashboard_id": dashboard_id,
+                    "ai_suggestion": ai_suggestion
+                }
+            )
+
+            session.commit()
+
+            dashboard = result.fetchone()
+
+        if not dashboard:
+            return None
+
+        return dict(dashboard._mapping)
+    
+    def select_dashboard_by_id(
+        self,
+        dashboard_id: int
+    ) -> dict | None:
+
+        with self.db.connect() as session:
+            result = session.execute(
+                text("""
+                    SELECT *
+                    FROM dashboards
+                    WHERE id = :dashboard_id
+                """),
+                {
+                    "dashboard_id": dashboard_id
+                }
+            )
+
+            dashboard = result.fetchone()
+
+        if not dashboard:
+            return None
+
+        return dict(dashboard._mapping)

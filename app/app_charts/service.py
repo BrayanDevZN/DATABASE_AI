@@ -28,7 +28,7 @@ class ServiceCharts:
         dashboard_id: int,
         chart_type: str,
         title: str,
-        chart_data: dict,
+        chart_data: dict | list,
         chart_config: dict | None = None
     ) -> dict | None:
         return self.repo.create_chart(
@@ -36,7 +36,7 @@ class ServiceCharts:
             chart_type=chart_type,
             title=title,
             chart_data=chart_data,
-            chart_config=chart_config
+            chart_config=chart_config or {}
         )
 
     def save_chart_settings(
@@ -117,6 +117,114 @@ class ServiceCharts:
         dashboard["chart_settings"] = dashboard_settings or {}
 
         return dashboard
+
+    def select_dashboards_by_data_source(
+        self,
+        user_id: int,
+        data_source_id: int
+    ) -> list[dict]:
+        return self.repo.select_dashboards_by_data_source(
+            user_id=user_id,
+            data_source_id=data_source_id
+        )
+
+    def mark_dashboards_outdated_by_data_source(
+        self,
+        data_source_id: int
+    ) -> bool:
+        return self.repo.mark_dashboards_outdated(
+            data_source_id=data_source_id
+        )
+
+    def replace_dashboard_charts(
+        self,
+        dashboard_id: int,
+        charts: list[dict]
+    ) -> list[dict]:
+        if not charts:
+            raise ValueError("Nenhum gráfico recebido para substituir.")
+
+        self.repo.delete_charts_by_dashboard(
+            dashboard_id=dashboard_id
+        )
+
+        created_charts = []
+
+        for index, chart in enumerate(charts):
+            chart_type = (
+                chart.get("chart_type")
+                or chart.get("type")
+                or "bar"
+            )
+
+            title = chart.get("title") or f"Gráfico {index + 1}"
+
+            chart_data = (
+                chart.get("chart_data")
+                or chart.get("data")
+                or []
+            )
+
+            chart_config = chart.get("chart_config") or {
+                "x": chart.get("x"),
+                "y": chart.get("y"),
+                "metric": chart.get("metric"),
+                "group_by": chart.get("group_by"),
+                "aggregation": chart.get("aggregation"),
+                "operation": chart.get("operation"),
+                "reason": chart.get("reason", ""),
+            }
+
+            created_chart = self.repo.create_chart(
+                dashboard_id=dashboard_id,
+                chart_type=chart_type,
+                title=title,
+                chart_data=chart_data,
+                chart_config=chart_config
+            )
+
+            if created_chart:
+                created_charts.append(created_chart)
+
+        if not created_charts:
+            raise ValueError("Erro ao criar novos gráficos do dashboard.")
+
+        return created_charts
+
+    def finish_dashboard_refresh(
+        self,
+        user_id: int,
+        dashboard_id: int,
+        ai_suggestion: str,
+        charts: list[dict]
+    ) -> dict:
+        dashboard = self.repo.select_dashboard(
+            user_id=user_id,
+            dashboard_id=dashboard_id
+        )
+
+        if not dashboard:
+            raise ValueError("Dashboard não encontrado.")
+
+        created_charts = self.replace_dashboard_charts(
+            dashboard_id=dashboard_id,
+            charts=charts
+        )
+
+        if hasattr(self.repo, "update_dashboard_after_refresh"):
+            updated_dashboard = self.repo.update_dashboard_after_refresh(
+                user_id=user_id,
+                dashboard_id=dashboard_id,
+                ai_suggestion=ai_suggestion
+            )
+        else:
+            updated_dashboard = dashboard
+
+        updated_dashboard["charts"] = created_charts
+        updated_dashboard["ai_suggestion"] = ai_suggestion
+        updated_dashboard["is_outdated"] = False
+
+        return updated_dashboard
 
     def delete_dashboard(
         self,

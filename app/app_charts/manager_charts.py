@@ -92,6 +92,48 @@ class ManagerCharts:
         )
 
     def delete_all_by_user(self, user_id: int) -> bool:
-        return self.service.delete_all_by_user(
-            user_id=user_id
+            return self.service.delete_all_by_user(
+                user_id=user_id
+            )
+            
+    def select_dashboards_by_data_source(
+            self,
+            user_id: int,
+            data_source_id: int
+        ) -> list[dict]:
+            return self.service.select_dashboards_by_data_source(
+                user_id=user_id,
+                data_source_id=data_source_id
+            )
+
+    def mark_dashboards_outdated_by_data_source(
+        self,
+        data_source_id: int
+    ) -> bool:
+        return self.service.mark_dashboards_outdated_by_data_source(
+            data_source_id=data_source_id
+        )
+
+    def replace_dashboard_charts(
+        self,
+        dashboard_id: int,
+        charts: list[dict]
+    ) -> list[dict]:
+        return self.service.replace_dashboard_charts(
+            dashboard_id=dashboard_id,
+            charts=charts
+        )
+
+    def finish_dashboard_refresh(
+        self,
+        user_id: int,
+        dashboard_id: int,
+        ai_suggestion: str,
+        charts: list[dict]
+    ) -> dict:
+        return self.service.finish_dashboard_refresh(
+            user_id=user_id,
+            dashboard_id=dashboard_id,
+            ai_suggestion=ai_suggestion,
+            charts=charts
         )
