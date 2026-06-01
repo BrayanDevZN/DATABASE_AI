@@ -33,12 +33,12 @@ class DeleteDashboard(BaseModel):
 class CreateDashboard(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    token: str = Field(min_length=1)
+    token: str
     title: str = Field(min_length=1)
     prompt: str = Field(min_length=1)
-
     ai_suggestion: str | None = None
     file_name: str | None = None
+    data_source_id: int | None = Field(default=None, gt=0)
 
 
 class CreateChart(BaseModel):
@@ -156,3 +156,11 @@ class DashboardWithChartsResponse(DashboardResponse):
     chart_settings: ChartSettingsResponse | dict[str, Any] = Field(
         default_factory=dict
     )
+    
+
+class UpdateDashboard(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    token: str
+    dashboard_id: int = Field(gt=0)
+    force: bool = False

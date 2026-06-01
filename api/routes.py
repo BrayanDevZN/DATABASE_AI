@@ -311,12 +311,13 @@ def create_dashboard(data: chart_models.CreateDashboard):
     )
 
     dashboard = charts_manager.ManagerCharts().create_dashboard(
-        user_id=user_id,
-        title=data.title,
-        prompt=data.prompt,
-        ai_suggestion=data.ai_suggestion,
-        file_name=data.file_name
-    )
+    user_id=user_id,
+    title=data.title,
+    prompt=data.prompt,
+    ai_suggestion=data.ai_suggestion,
+    file_name=data.file_name,
+    data_source_id=data.data_source_id
+)
 
     return {
         "dashboard": dashboard

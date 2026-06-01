@@ -15,7 +15,8 @@ class RepositoryCharts:
         title: str,
         prompt: str,
         ai_suggestion: str | None,
-        file_name: str | None
+        file_name: str | None,
+        data_source_id: int | None = None
     ) -> dict | None:
         with self.db.connect() as session:
             result = session.execute(
@@ -25,14 +26,18 @@ class RepositoryCharts:
                         title,
                         prompt,
                         ai_suggestion,
-                        file_name
+                        file_name,
+                        data_source_id,
+                        is_outdated
                     )
                     VALUES (
                         :user_id,
                         :title,
                         :prompt,
                         :ai_suggestion,
-                        :file_name
+                        :file_name,
+                        :data_source_id,
+                        FALSE
                     )
                     RETURNING *
                 """),
@@ -41,7 +46,8 @@ class RepositoryCharts:
                     "title": title,
                     "prompt": prompt,
                     "ai_suggestion": ai_suggestion,
-                    "file_name": file_name
+                    "file_name": file_name,
+                    "data_source_id": data_source_id
                 }
             )
 

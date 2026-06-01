@@ -11,16 +11,17 @@ class ManagerCharts:
         title: str,
         prompt: str,
         ai_suggestion: str | None,
-        file_name: str | None
+        file_name: str | None,
+        data_source_id: int | None = None
     ) -> dict | None:
         return self.service.create_dashboard(
             user_id=user_id,
             title=title,
             prompt=prompt,
             ai_suggestion=ai_suggestion,
-            file_name=file_name
+            file_name=file_name,
+            data_source_id=data_source_id
         )
-
     def create_chart(
         self,
         dashboard_id: int,
