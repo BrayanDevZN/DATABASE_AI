@@ -1,6 +1,12 @@
-from sqlalchemy import text
-from connect.manager_database import main_database
+from datetime import date, datetime
 import json
+import math
+
+import pandas as pd
+from sqlalchemy import text
+
+from connect.manager_database import main_database
+
 
 engine = main_database()
 
@@ -8,6 +14,55 @@ engine = main_database()
 class RepositoryDataSources:
     def __init__(self) -> None:
         self.db = engine
+
+    def _make_json_safe(self, value):
+        if isinstance(value, dict):
+            return {
+                str(key): self._make_json_safe(item)
+                for key, item in value.items()
+            }
+
+        if isinstance(value, list):
+            return [
+                self._make_json_safe(item)
+                for item in value
+            ]
+
+        if isinstance(value, tuple):
+            return [
+                self._make_json_safe(item)
+                for item in value
+            ]
+
+        if isinstance(value, pd.Timestamp):
+            return value.isoformat()
+
+        if isinstance(value, (datetime, date)):
+            return value.isoformat()
+
+        if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+            return None
+
+        if pd.isna(value) if not isinstance(value, (list, dict, tuple, str)) else False:
+            return None
+
+        if hasattr(value, "item"):
+            try:
+                return value.item()
+            except Exception:
+                return value
+
+        return value
+
+    def _json_dumps(self, value) -> str:
+        return json.dumps(
+            self._make_json_safe(value),
+            ensure_ascii=False,
+            default=str
+        )
+
+    def _row_to_dict(self, row) -> dict | None:
+        return dict(row._mapping) if row else None
 
     def create_data_source(
         self,
@@ -43,16 +98,16 @@ class RepositoryDataSources:
                     "user_id": user_id,
                     "name": name,
                     "file_name": file_name,
-                    "file_data": json.dumps(file_data, ensure_ascii=False),
+                    "file_data": self._json_dumps(file_data),
                     "row_count": row_count,
-                    "column_count": column_count
+                    "column_count": column_count,
                 }
             )
 
             session.commit()
             data_source = result.fetchone()
 
-        return dict(data_source._mapping) if data_source else None
+        return self._row_to_dict(data_source)
 
     def select_data_sources_by_user(
         self,
@@ -99,13 +154,13 @@ class RepositoryDataSources:
                 """),
                 {
                     "data_source_id": data_source_id,
-                    "user_id": user_id
+                    "user_id": user_id,
                 }
             )
 
             data_source = result.fetchone()
 
-        return dict(data_source._mapping) if data_source else None
+        return self._row_to_dict(data_source)
 
     def update_data_source(
         self,
@@ -134,16 +189,16 @@ class RepositoryDataSources:
                     "user_id": user_id,
                     "data_source_id": data_source_id,
                     "file_name": file_name,
-                    "file_data": json.dumps(file_data, ensure_ascii=False),
+                    "file_data": self._json_dumps(file_data),
                     "row_count": row_count,
-                    "column_count": column_count
+                    "column_count": column_count,
                 }
             )
 
             session.commit()
             data_source = result.fetchone()
 
-        return dict(data_source._mapping) if data_source else None
+        return self._row_to_dict(data_source)
 
     def rename_data_source(
         self,
@@ -173,14 +228,14 @@ class RepositoryDataSources:
                 {
                     "user_id": user_id,
                     "data_source_id": data_source_id,
-                    "name": name
+                    "name": name,
                 }
             )
 
             session.commit()
             data_source = result.fetchone()
 
-        return dict(data_source._mapping) if data_source else None
+        return self._row_to_dict(data_source)
 
     def delete_data_source(
         self,
@@ -196,7 +251,7 @@ class RepositoryDataSources:
                 """),
                 {
                     "data_source_id": data_source_id,
-                    "user_id": user_id
+                    "user_id": user_id,
                 }
             )
 

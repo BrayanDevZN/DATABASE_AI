@@ -1,9 +1,59 @@
+from datetime import date, datetime
+import math
+
+import pandas as pd
+
 from app.app_data_sources.repository import RepositoryDataSources
 
 
 class ServiceDataSources:
     def __init__(self) -> None:
         self.repo = RepositoryDataSources()
+
+    def _make_json_safe(self, value):
+        if isinstance(value, dict):
+            return {
+                str(key): self._make_json_safe(item)
+                for key, item in value.items()
+            }
+
+        if isinstance(value, list):
+            return [
+                self._make_json_safe(item)
+                for item in value
+            ]
+
+        if isinstance(value, tuple):
+            return [
+                self._make_json_safe(item)
+                for item in value
+            ]
+
+        if isinstance(value, pd.Timestamp):
+            return value.isoformat()
+
+        if isinstance(value, (datetime, date)):
+            return value.isoformat()
+
+        if pd.isna(value) if not isinstance(value, (list, dict, tuple, str)) else False:
+            return None
+
+        if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+            return None
+
+        if hasattr(value, "item"):
+            try:
+                return value.item()
+            except Exception:
+                return value
+
+        return value
+
+    def _safe_file_data(self, file_data: list[dict]) -> list[dict]:
+        if not isinstance(file_data, list):
+            return []
+
+        return self._make_json_safe(file_data)
 
     def create_data_source(
         self,
@@ -14,6 +64,8 @@ class ServiceDataSources:
         row_count: int,
         column_count: int
     ) -> dict | None:
+        file_data = self._safe_file_data(file_data)
+
         return self.repo.create_data_source(
             user_id=user_id,
             name=name,
@@ -50,6 +102,8 @@ class ServiceDataSources:
         row_count: int,
         column_count: int
     ) -> dict | None:
+        file_data = self._safe_file_data(file_data)
+
         return self.repo.update_data_source(
             user_id=user_id,
             data_source_id=data_source_id,
