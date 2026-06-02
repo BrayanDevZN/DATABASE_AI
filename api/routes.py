@@ -10,16 +10,19 @@ import api.model.model_accounts as models
 import api.model.model_conversation as conversation_models
 import api.model.model_charts as chart_models
 import api.model.model_data_source as data_source_models
+import api.model.model_collaboration as collaboration_models
 
 import app.app_accounts.manager_accounts as manager
 import app.app_conversations.manager_conversation as conversation_manager
 import app.app_charts.manager_charts as charts_manager
 import app.app_data_sources.manager_data_sources as data_source_manager
+from app.app_collaborations.manager_collaborations import ManagerCollaborations
 
 from auth.jwt import JWT
 
 
 app = FastAPI()
+collaborations = ManagerCollaborations()
 
 app.add_middleware(
     CORSMiddleware,
@@ -216,20 +219,27 @@ def create_data_source(token: str = Form(...), name: str = Form(...), file: Uplo
 @app.post("/data-sources", status_code=status.HTTP_200_OK)
 def select_data_sources(data: data_source_models.WithToken):
     user_id = get_user_id_from_token(data.token)
+    owned = data_source_manager.ManagerDataSources().select_data_sources_by_user(user_id=user_id)
+    shared = collaborations.select_shared_data_sources(user_id)
 
     return {
-        "data_sources": data_source_manager.ManagerDataSources().select_data_sources_by_user(user_id=user_id)
+        "data_sources": owned + shared
     }
 
 
 @app.post("/data-source", status_code=status.HTTP_200_OK)
 def select_data_source(data: data_source_models.GetDataSource):
     user_id = get_user_id_from_token(data.token)
+    access = collaborations.select_data_source_access(user_id, data.data_source_id)
+    if not access:
+        raise ValueError("Fonte de dados nao encontrada ou sem permissao.")
 
     data_source = data_source_manager.ManagerDataSources().select_data_source(
-        user_id=user_id,
+        user_id=access["owner_user_id"],
         data_source_id=data.data_source_id,
     )
+    if data_source:
+        data_source["is_shared"] = access["access_permission"] != "owner"
 
     return {"data_source": data_source}
 
@@ -237,11 +247,19 @@ def select_data_source(data: data_source_models.GetDataSource):
 @app.post("/data-source/linked-dashboards", status_code=status.HTTP_200_OK)
 def select_linked_dashboards(data: data_source_models.GetDataSource):
     user_id = get_user_id_from_token(data.token)
+    access = collaborations.select_data_source_access(user_id, data.data_source_id)
+    if not access:
+        raise ValueError("Fonte de dados nao encontrada ou sem permissao.")
 
     dashboards = charts_manager.ManagerCharts().select_dashboards_by_data_source(
-        user_id=user_id,
+        user_id=access["owner_user_id"],
         data_source_id=data.data_source_id,
     )
+    if access["access_permission"] != "owner":
+        dashboards = [
+            dashboard for dashboard in dashboards
+            if (collaborations.select_dashboard_access(user_id, dashboard["id"]) or {}).get("access_permission") == "full"
+        ]
 
     return {
         "dashboards": dashboards,
@@ -257,16 +275,24 @@ def update_data_source(
     file: UploadFile = File(...),
 ):
     user_id = get_user_id_from_token(token)
+    access = collaborations.select_data_source_access(user_id, data_source_id)
+    if not access:
+        raise ValueError("Fonte de dados nao encontrada ou sem permissao.")
 
     linked_dashboards = charts_manager.ManagerCharts().select_dashboards_by_data_source(
-        user_id=user_id,
+        user_id=access["owner_user_id"],
         data_source_id=data_source_id,
     )
+    if access["access_permission"] != "owner":
+        linked_dashboards = [
+            dashboard for dashboard in linked_dashboards
+            if (collaborations.select_dashboard_access(user_id, dashboard["id"]) or {}).get("access_permission") == "full"
+        ]
 
     file_data, row_count, column_count = read_uploaded_file(file)
 
     data_source = data_source_manager.ManagerDataSources().update_data_source(
-        user_id=user_id,
+        user_id=access["owner_user_id"],
         data_source_id=data_source_id,
         file_name=file.filename,
         file_data=file_data,
@@ -296,9 +322,12 @@ def update_data_source(
 @app.patch("/data-source/rename", status_code=status.HTTP_200_OK)
 def rename_data_source(data: data_source_models.RenameDataSource):
     user_id = get_user_id_from_token(data.token)
+    access = collaborations.select_data_source_access(user_id, data.data_source_id)
+    if not access:
+        raise ValueError("Fonte de dados nao encontrada ou sem permissao.")
 
     data_source = data_source_manager.ManagerDataSources().rename_data_source(
-        user_id=user_id,
+        user_id=access["owner_user_id"],
         data_source_id=data.data_source_id,
         name=data.name,
     )
@@ -325,7 +354,8 @@ def select_dashboards(data: chart_models.WithToken):
     user_id = get_user_id_from_token(data.token)
 
     return {
-        "dashboards": charts_manager.ManagerCharts().select_dashboards_by_user(user_id=user_id)
+        "dashboards": charts_manager.ManagerCharts().select_dashboards_by_user(user_id=user_id),
+        "shared_dashboards": collaborations.select_shared_dashboards(user_id),
     }
 
 
@@ -412,7 +442,7 @@ def save_chart_settings(data: chart_models.SaveChartSettings):
         dashboard_id=data.dashboard_id,
     )
 
-    if not dashboard:
+    if not dashboard or dashboard["access_permission"] not in ("owner", "edit", "full"):
         return {
             "status": False,
             "message": "Dashboard não encontrado ou não pertence ao usuário.",
@@ -457,6 +487,53 @@ def delete_dashboard(data: chart_models.DeleteDashboard):
     )
 
     return {"status": deleted}
+
+
+# COLLABORATIONS
+
+@app.post("/users/search", status_code=status.HTTP_200_OK)
+def search_users(data: collaboration_models.SearchUsers):
+    user_id = get_user_id_from_token(data.token)
+    return {"users": collaborations.search_users(user_id, data.query)}
+
+
+@app.post("/collaborations", status_code=status.HTTP_200_OK)
+def select_collaboration_overview(data: collaboration_models.WithToken):
+    user_id = get_user_id_from_token(data.token)
+    return {
+        "dashboards": charts_manager.ManagerCharts().select_dashboards_by_user(user_id=user_id),
+        "shared_dashboards": collaborations.select_shared_dashboards(user_id),
+    }
+
+
+@app.post("/dashboard/collaborations", status_code=status.HTTP_200_OK)
+def select_dashboard_collaborations(data: collaboration_models.DashboardCollaborations):
+    user_id = get_user_id_from_token(data.token)
+    return {"collaborators": collaborations.list_dashboard_collaborations(user_id, data.dashboard_id)}
+
+
+@app.post("/dashboard/collaboration/share", status_code=status.HTTP_201_CREATED)
+def share_dashboard(data: collaboration_models.ShareDashboard):
+    user_id = get_user_id_from_token(data.token)
+    collaboration = collaborations.share_dashboard(
+        user_id, data.dashboard_id, data.username, data.permission
+    )
+    return {"collaboration": collaboration}
+
+
+@app.patch("/dashboard/collaboration", status_code=status.HTTP_200_OK)
+def update_collaboration(data: collaboration_models.UpdateCollaboration):
+    user_id = get_user_id_from_token(data.token)
+    collaboration = collaborations.update_collaboration(
+        user_id, data.collaboration_id, data.permission
+    )
+    return {"collaboration": collaboration}
+
+
+@app.delete("/dashboard/collaboration", status_code=status.HTTP_200_OK)
+def delete_collaboration(data: collaboration_models.DeleteCollaboration):
+    user_id = get_user_id_from_token(data.token)
+    return {"status": collaborations.delete_collaboration(user_id, data.collaboration_id)}
 
 
 @app.delete("/delete_user", status_code=status.HTTP_200_OK)

@@ -1,9 +1,11 @@
 from app.app_charts.repository import RepositoryCharts
+from app.app_collaborations.manager_collaborations import ManagerCollaborations
 
 
 class ServiceCharts:
     def __init__(self) -> None:
         self.repo = RepositoryCharts()
+        self.collaborations = ManagerCollaborations()
 
     def create_dashboard(
         self,
@@ -80,10 +82,7 @@ class ServiceCharts:
         user_id: int,
         dashboard_id: int
     ) -> dict | None:
-        dashboard = self.repo.select_dashboard(
-            user_id=user_id,
-            dashboard_id=dashboard_id
-        )
+        dashboard = self.collaborations.select_dashboard_access(user_id, dashboard_id)
 
         if not dashboard:
             return None
@@ -199,12 +198,9 @@ class ServiceCharts:
         charts: list[dict],
         prompt: str | None = None
     ) -> dict:
-        dashboard = self.repo.select_dashboard(
-            user_id=user_id,
-            dashboard_id=dashboard_id
-        )
+        dashboard = self.collaborations.select_dashboard_access(user_id, dashboard_id)
 
-        if not dashboard:
+        if not dashboard or dashboard["access_permission"] not in ("owner", "full"):
             raise ValueError("Dashboard não encontrado.")
 
         created_charts = self.replace_dashboard_charts(
@@ -214,7 +210,7 @@ class ServiceCharts:
 
         if hasattr(self.repo, "update_dashboard_after_refresh"):
             updated_dashboard = self.repo.update_dashboard_after_refresh(
-                user_id=user_id,
+                user_id=dashboard["user_id"],
                 dashboard_id=dashboard_id,
                 ai_suggestion=ai_suggestion,
                 prompt=prompt
