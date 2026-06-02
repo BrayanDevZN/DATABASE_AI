@@ -32,3 +32,11 @@ class UpdateCollaboration(WithToken):
 
 class DeleteCollaboration(WithToken):
     collaboration_id: int = Field(gt=0)
+
+
+class RespondInvitation(DeleteCollaboration):
+    response: Literal["accepted", "declined"]
+
+
+class MarkNotificationRead(WithToken):
+    notification_id: int = Field(gt=0)

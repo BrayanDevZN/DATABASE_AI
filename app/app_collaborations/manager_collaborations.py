@@ -27,7 +27,7 @@ class ManagerCollaborations:
         with self.db.connect() as session:
             row = session.execute(
                 text("""
-                    SELECT d.*, u.name AS creator_name, u.username AS creator_username,
+                    SELECT d.*, dc.id AS collaboration_id, u.name AS creator_name, u.username AS creator_username,
                         u.profile_image AS creator_profile_image,
                         CASE WHEN d.user_id = :user_id THEN 'owner' ELSE dc.permission END AS access_permission,
                         (d.user_id <> :user_id) AS is_shared
@@ -35,6 +35,7 @@ class ManagerCollaborations:
                     JOIN users u ON u.user_id = d.user_id
                     LEFT JOIN dashboard_collaborations dc
                         ON dc.dashboard_id = d.id AND dc.collaborator_user_id = :user_id
+                        AND dc.status = 'accepted'
                     WHERE d.id = :dashboard_id
                     AND (d.user_id = :user_id OR dc.id IS NOT NULL)
                 """),
@@ -46,13 +47,13 @@ class ManagerCollaborations:
         with self.db.connect() as session:
             rows = session.execute(
                 text("""
-                    SELECT d.*, dc.permission AS access_permission, TRUE AS is_shared,
+                    SELECT d.*, dc.id AS collaboration_id, dc.permission AS access_permission, TRUE AS is_shared,
                         u.name AS creator_name, u.username AS creator_username,
                         u.profile_image AS creator_profile_image
                     FROM dashboard_collaborations dc
                     JOIN dashboards d ON d.id = dc.dashboard_id
                     JOIN users u ON u.user_id = d.user_id
-                    WHERE dc.collaborator_user_id = :user_id
+                    WHERE dc.collaborator_user_id = :user_id AND dc.status = 'accepted'
                     ORDER BY dc.updated_at DESC
                 """),
                 {"user_id": user_id}
@@ -72,6 +73,7 @@ class ManagerCollaborations:
                     JOIN data_sources ds ON ds.id = d.data_source_id
                     JOIN users u ON u.user_id = ds.user_id
                     WHERE dc.collaborator_user_id = :user_id AND dc.permission = 'full'
+                    AND dc.status = 'accepted'
                     ORDER BY ds.id, ds.updated_at DESC
                 """),
                 {"user_id": user_id}
@@ -91,6 +93,7 @@ class ManagerCollaborations:
                             JOIN dashboards d ON d.id = dc.dashboard_id
                             WHERE d.data_source_id = ds.id
                             AND dc.collaborator_user_id = :user_id AND dc.permission = 'full'
+                            AND dc.status = 'accepted'
                         )
                     )
                 """),
@@ -106,10 +109,10 @@ class ManagerCollaborations:
             rows = session.execute(
                 text("""
                     SELECT dc.id, dc.dashboard_id, dc.permission, dc.created_at, dc.updated_at,
-                        u.user_id, u.name, u.username, u.profile_image
+                        dc.status, u.user_id, u.name, u.username, u.profile_image
                     FROM dashboard_collaborations dc
                     JOIN users u ON u.user_id = dc.collaborator_user_id
-                    WHERE dc.dashboard_id = :dashboard_id ORDER BY u.username
+                    WHERE dc.dashboard_id = :dashboard_id ORDER BY dc.status, u.username
                 """),
                 {"dashboard_id": dashboard_id}
             ).fetchall()
@@ -131,15 +134,27 @@ class ManagerCollaborations:
             row = session.execute(
                 text("""
                     INSERT INTO dashboard_collaborations
-                        (dashboard_id, owner_user_id, collaborator_user_id, permission, updated_at)
-                    VALUES (:dashboard_id, :owner_user_id, :collaborator_user_id, :permission, NOW())
+                        (dashboard_id, owner_user_id, collaborator_user_id, permission, status, updated_at)
+                    VALUES (:dashboard_id, :owner_user_id, :collaborator_user_id, :permission, 'pending', NOW())
                     ON CONFLICT (dashboard_id, collaborator_user_id)
-                    DO UPDATE SET permission = EXCLUDED.permission, updated_at = NOW()
+                    DO UPDATE SET permission = EXCLUDED.permission, status = 'pending', updated_at = NOW()
                     RETURNING *
                 """),
                 {"dashboard_id": dashboard_id, "owner_user_id": user_id,
                  "collaborator_user_id": collaborator.user_id, "permission": permission}
             ).fetchone()
+            session.execute(
+                text("""
+                    INSERT INTO collaboration_notifications
+                        (user_id, collaboration_id, message, notification_type)
+                    VALUES (:user_id, :collaboration_id, :message, 'invitation')
+                """),
+                {
+                    "user_id": collaborator.user_id,
+                    "collaboration_id": row.id,
+                    "message": f"@{access['creator_username']} convidou voce para colaborar em {access['title']}.",
+                }
+            )
             session.commit()
         return dict(row._mapping)
 
@@ -160,8 +175,113 @@ class ManagerCollaborations:
     def delete_collaboration(self, user_id: int, collaboration_id: int) -> bool:
         with self.db.connect() as session:
             result = session.execute(
-                text("DELETE FROM dashboard_collaborations WHERE id = :id AND owner_user_id = :user_id"),
+                text("""
+                    DELETE FROM dashboard_collaborations
+                    WHERE id = :id
+                    AND (owner_user_id = :user_id OR collaborator_user_id = :user_id)
+                """),
                 {"id": collaboration_id, "user_id": user_id}
             )
             session.commit()
         return result.rowcount > 0
+
+    def select_invitations(self, user_id: int) -> list[dict]:
+        with self.db.connect() as session:
+            rows = session.execute(
+                text("""
+                    SELECT dc.id, dc.dashboard_id, dc.permission, dc.status, dc.created_at,
+                        d.title, u.name AS creator_name, u.username AS creator_username,
+                        u.profile_image AS creator_profile_image
+                    FROM dashboard_collaborations dc
+                    JOIN dashboards d ON d.id = dc.dashboard_id
+                    JOIN users u ON u.user_id = dc.owner_user_id
+                    WHERE dc.collaborator_user_id = :user_id AND dc.status = 'pending'
+                    ORDER BY dc.created_at DESC
+                """),
+                {"user_id": user_id}
+            ).fetchall()
+        return [dict(row._mapping) for row in rows]
+
+    def respond_invitation(self, user_id: int, collaboration_id: int, response: str) -> dict:
+        with self.db.connect() as session:
+            row = session.execute(
+                text("""
+                    UPDATE dashboard_collaborations dc
+                    SET status = :response, updated_at = NOW()
+                    FROM dashboards d, users u
+                    WHERE dc.id = :collaboration_id
+                    AND dc.collaborator_user_id = :user_id
+                    AND dc.status = 'pending'
+                    AND d.id = dc.dashboard_id
+                    AND u.user_id = dc.collaborator_user_id
+                    RETURNING dc.*, d.title, u.username
+                """),
+                {"user_id": user_id, "collaboration_id": collaboration_id, "response": response}
+            ).fetchone()
+            if not row:
+                raise ValueError("Convite nao encontrado.")
+            verb = "aceitou" if response == "accepted" else "recusou"
+            session.execute(
+                text("""
+                    INSERT INTO collaboration_notifications
+                        (user_id, collaboration_id, message, notification_type)
+                    VALUES (:user_id, :collaboration_id, :message, :notification_type)
+                """),
+                {
+                    "user_id": row.owner_user_id,
+                    "collaboration_id": row.id,
+                    "message": f"@{row.username} {verb} o convite para {row.title}.",
+                    "notification_type": response,
+                }
+            )
+            session.commit()
+        return dict(row._mapping)
+
+    def select_notifications(self, user_id: int) -> list[dict]:
+        with self.db.connect() as session:
+            rows = session.execute(
+                text("""
+                    SELECT id, collaboration_id, message, notification_type, is_read, created_at
+                    FROM collaboration_notifications
+                    WHERE user_id = :user_id
+                    ORDER BY created_at DESC
+                    LIMIT 30
+                """),
+                {"user_id": user_id}
+            ).fetchall()
+        return [dict(row._mapping) for row in rows]
+
+    def mark_notification_read(self, user_id: int, notification_id: int) -> bool:
+        with self.db.connect() as session:
+            result = session.execute(
+                text("""
+                    UPDATE collaboration_notifications SET is_read = TRUE
+                    WHERE id = :notification_id AND user_id = :user_id
+                """),
+                {"user_id": user_id, "notification_id": notification_id}
+            )
+            session.commit()
+        return result.rowcount > 0
+
+    def list_dashboard_access(self, user_id: int, dashboard_id: int) -> list[dict]:
+        access = self.select_dashboard_access(user_id, dashboard_id)
+        if not access:
+            raise ValueError("Dashboard nao encontrado ou sem permissao.")
+        with self.db.connect() as session:
+            rows = session.execute(
+                text("""
+                    SELECT NULL::INTEGER AS id, 'owner' AS permission, 'accepted' AS status,
+                        u.user_id, u.name, u.username, u.profile_image
+                    FROM dashboards d
+                    JOIN users u ON u.user_id = d.user_id
+                    WHERE d.id = :dashboard_id
+                    UNION ALL
+                    SELECT dc.id, dc.permission, dc.status, u.user_id, u.name, u.username, u.profile_image
+                    FROM dashboard_collaborations dc
+                    JOIN users u ON u.user_id = dc.collaborator_user_id
+                    WHERE dc.dashboard_id = :dashboard_id AND dc.status = 'accepted'
+                    ORDER BY username
+                """),
+                {"dashboard_id": dashboard_id}
+            ).fetchall()
+        return [dict(row._mapping) for row in rows]

@@ -356,6 +356,7 @@ def select_dashboards(data: chart_models.WithToken):
     return {
         "dashboards": charts_manager.ManagerCharts().select_dashboards_by_user(user_id=user_id),
         "shared_dashboards": collaborations.select_shared_dashboards(user_id),
+        "invitations": collaborations.select_invitations(user_id),
     }
 
 
@@ -503,6 +504,7 @@ def select_collaboration_overview(data: collaboration_models.WithToken):
     return {
         "dashboards": charts_manager.ManagerCharts().select_dashboards_by_user(user_id=user_id),
         "shared_dashboards": collaborations.select_shared_dashboards(user_id),
+        "invitations": collaborations.select_invitations(user_id),
     }
 
 
@@ -534,6 +536,34 @@ def update_collaboration(data: collaboration_models.UpdateCollaboration):
 def delete_collaboration(data: collaboration_models.DeleteCollaboration):
     user_id = get_user_id_from_token(data.token)
     return {"status": collaborations.delete_collaboration(user_id, data.collaboration_id)}
+
+
+@app.post("/dashboard/collaboration/respond", status_code=status.HTTP_200_OK)
+def respond_collaboration_invitation(data: collaboration_models.RespondInvitation):
+    user_id = get_user_id_from_token(data.token)
+    return {
+        "collaboration": collaborations.respond_invitation(
+            user_id, data.collaboration_id, data.response
+        )
+    }
+
+
+@app.post("/dashboard/access", status_code=status.HTTP_200_OK)
+def select_dashboard_access_list(data: collaboration_models.DashboardCollaborations):
+    user_id = get_user_id_from_token(data.token)
+    return {"collaborators": collaborations.list_dashboard_access(user_id, data.dashboard_id)}
+
+
+@app.post("/notifications", status_code=status.HTTP_200_OK)
+def select_notifications(data: collaboration_models.WithToken):
+    user_id = get_user_id_from_token(data.token)
+    return {"notifications": collaborations.select_notifications(user_id)}
+
+
+@app.patch("/notification/read", status_code=status.HTTP_200_OK)
+def mark_notification_read(data: collaboration_models.MarkNotificationRead):
+    user_id = get_user_id_from_token(data.token)
+    return {"status": collaborations.mark_notification_read(user_id, data.notification_id)}
 
 
 @app.delete("/delete_user", status_code=status.HTTP_200_OK)
