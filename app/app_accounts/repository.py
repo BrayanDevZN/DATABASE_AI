@@ -11,6 +11,7 @@ class RepositoryAccount:
     def create(
         self,
         name: str,
+        username: str,
         email: str,
         password: str,
         role: str,
@@ -21,12 +22,13 @@ class RepositoryAccount:
         with self.db.connect() as session:
             result = session.execute(
                 text("""
-                    INSERT INTO users (name, email, password, role, status, age, gender)
-                    VALUES (:name, :email, :password, :role, :status, :age, :gender)
-                    RETURNING user_id, name, email, password, role, status, created_at, age, gender
+                    INSERT INTO users (name, username, email, password, role, status, age, gender)
+                    VALUES (:name, :username, :email, :password, :role, :status, :age, :gender)
+                    RETURNING user_id, name, username, email, password, role, status, created_at, age, gender, profile_image
                 """),
                 {
                     "name": name,
+                    "username": username,
                     "email": email,
                     "password": password,
                     "role": role,
@@ -45,7 +47,7 @@ class RepositoryAccount:
         with self.db.connect() as session:
             result = session.execute(
                 text("""
-                    SELECT user_id, name,gender, age, email, password, role, status, created_at
+                    SELECT user_id, name, username, gender, age, email, password, role, status, created_at, profile_image
                     FROM users
                     WHERE user_id = :user_id
                 """),
@@ -60,7 +62,7 @@ class RepositoryAccount:
         with self.db.connect() as session:
             result = session.execute(
                 text("""
-                    SELECT user_id, name,gender, age, email, password, role, status, created_at
+                    SELECT user_id, name, username, gender, age, email, password, role, status, created_at, profile_image
                     FROM users
                     WHERE email = :email
                 """),
@@ -75,7 +77,7 @@ class RepositoryAccount:
         with self.db.connect() as session:
             result = session.execute(
                 text("""
-                    SELECT user_id, name,gender, age, email, password, role, status, created_at
+                    SELECT user_id, name, username, gender, age, email, password, role, status, created_at, profile_image
                     FROM users
                     ORDER BY user_id
                 """)
@@ -85,14 +87,32 @@ class RepositoryAccount:
 
         return [dict(user._mapping) for user in users]
 
+    def select_by_username(self, username: str) -> dict | None:
+        with self.db.connect() as session:
+            result = session.execute(
+                text("""
+                    SELECT user_id, name, username, gender, age, email, password, role, status, created_at, profile_image
+                    FROM users
+                    WHERE LOWER(username) = LOWER(:username)
+                """),
+                {"username": username}
+            )
+
+            user = result.fetchone()
+
+        return dict(user._mapping) if user else None
+
     def update(
         self,
         user_id: int,
         name: str | None = None,
+        username: str | None = None,
         email: str | None = None,
         password: str | None = None,
         role: str | None = None,
-        status: bool | None = None
+        status: bool | None = None,
+        profile_image: str | None = None,
+        update_profile_image: bool = False
     ) -> dict | None:
         with self.db.connect() as session:
             result = session.execute(
@@ -100,20 +120,28 @@ class RepositoryAccount:
                     UPDATE users
                     SET
                         name = COALESCE(:name, name),
+                        username = COALESCE(:username, username),
                         email = COALESCE(:email, email),
                         password = COALESCE(:password, password),
                         role = COALESCE(:role, role),
-                        status = COALESCE(:status, status)
+                        status = COALESCE(:status, status),
+                        profile_image = CASE
+                            WHEN :update_profile_image THEN :profile_image
+                            ELSE profile_image
+                        END
                     WHERE user_id = :user_id
-                    RETURNING user_id, name, email, password, role, status, created_at
+                    RETURNING user_id, name, username, email, password, role, status, created_at, profile_image
                 """),
                 {
                     "user_id": user_id,
                     "name": name,
+                    "username": username,
                     "email": email,
                     "password": password,
                     "role": role,
-                    "status": status
+                    "status": status,
+                    "profile_image": profile_image,
+                    "update_profile_image": update_profile_image
                 }
             )
 

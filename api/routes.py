@@ -109,6 +109,11 @@ def valid_user(data: models.ValidEmail):
     return manager.create_User().valid_user(data.model_dump())
 
 
+@app.post("/valid_username", status_code=status.HTTP_200_OK)
+def valid_username(data: models.ValidUsername):
+    return manager.create_User().valid_username(data.model_dump())
+
+
 @app.post("/login", status_code=status.HTTP_200_OK)
 def login(data: models.Login):
     return manager.User_Login().login(data.model_dump())
@@ -137,6 +142,16 @@ def check_pass(data: models.Pass):
 @app.patch("/update_name", status_code=status.HTTP_200_OK)
 def update_name(data: models.UpName):
     return manager.User_Login().update_name(data.model_dump())
+
+
+@app.patch("/update_username", status_code=status.HTTP_200_OK)
+def update_username(data: models.UpUsername):
+    return manager.User_Login().update_username(data.model_dump())
+
+
+@app.patch("/update_profile_image", status_code=status.HTTP_200_OK)
+def update_profile_image(data: models.UpProfileImage):
+    return manager.User_Login().update_profile_image(data.model_dump())
 
 
 @app.post("/valid_token", status_code=status.HTTP_200_OK)

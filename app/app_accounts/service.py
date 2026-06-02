@@ -10,11 +10,13 @@ class Service:
         self.valid = Valid()
         self.hash = hash3()
     
-    def create_account(self, name:str, email:str, password:str, age:int, gender=str) -> bool:
-        if self.app.select_by_email(email)is not None:
+    def create_account(self, name:str, username:str, email:str, password:str, age:int, gender=str) -> bool:
+        if self.app.select_by_email(email) is not None:
+            return False
+        if self.app.select_by_username(username) is not None:
             return False
         Pass = self.hash.encoder_bcr(password)
-        self.app.create(email=email, name=name, password=Pass, status=False, role="user", age=age, gender=gender)
+        self.app.create(email=email, name=name, username=username, password=Pass, status=False, role="user", age=age, gender=gender)
         return True
         
     def valid_pass(self, Pass: str, token: str) -> str:
@@ -254,6 +256,40 @@ class Service:
               return {"status":True}
           
           return {"status":False}
+
+    def update_username(self, new_username: str, token: str) -> dict:
+          user_id = self.jwt.get_jwt(key="user_id", token=token)
+          user = self.app.select(user_id)
+
+          if not user:
+              return {"status": False}
+
+          if user["username"] == new_username:
+              return {"status": "equal"}
+
+          if self.app.select_by_username(new_username):
+              return {"status": "exists"}
+
+          self.app.update(user_id=user_id, username=new_username)
+          return {"status": True, "username": new_username}
+
+    def update_profile_image(self, profile_image: str | None, token: str) -> dict:
+          user_id = self.jwt.get_jwt(key="user_id", token=token)
+          user = self.app.select(user_id)
+
+          if not user:
+              return {"status": False}
+
+          if profile_image and len(profile_image) > 1_500_000:
+              return {"status": False, "message": "Imagem muito grande."}
+
+          self.app.update(
+              user_id=user_id,
+              profile_image=profile_image,
+              update_profile_image=True
+          )
+
+          return {"status": True, "profile_image": profile_image}
       
     def update_pass_by_user_id(self, user_id: int, new_pass: str) -> bool | str:
         user = self.app.select(user_id)
@@ -292,6 +328,8 @@ class Service:
             "user": {
                 "user_id": user["user_id"],
                 "name": user["name"],
+                "username": user["username"],
+                "profile_image": user["profile_image"],
                 "email": user["email"],
                 "age": user["age"],
                 "gender": user["gender"],
@@ -342,7 +380,3 @@ class Service:
 
     def delete_user_by_id(self, user_id: int) -> bool:
         return self.app.delete(user_id=user_id)
-    
-        
-    
-    

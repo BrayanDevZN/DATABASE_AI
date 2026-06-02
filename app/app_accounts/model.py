@@ -3,6 +3,7 @@ from pydantic import BaseModel,  Field, field_validator
 class Model_user(BaseModel):
     
     name:str | None = None
+    username:str | None = None
     email:str | None = None
     token:str | None = None
     gender:str | None = None
@@ -32,3 +33,18 @@ class Model_user(BaseModel):
             raise ValueError(f"not letter in {v}")
         
         return v
+
+    @field_validator("username")
+    def valid_username(cls, v):
+        if v is None:
+            return v
+
+        username = v.strip().lower()
+
+        if len(username) < 3 or len(username) > 30:
+            raise ValueError("username must have between 3 and 30 characters")
+
+        if not username.replace("_", "").isalnum():
+            raise ValueError("username must contain only letters, numbers and underscores")
+
+        return username

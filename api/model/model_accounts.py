@@ -7,12 +7,19 @@ class ValidEmail(BaseModel):
     email: str
 
 
+class ValidUsername(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    username: str
+
+
 class CreateUser(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     email: str
     password: str
     name: str
+    username: str
     age: int
     gender: str
     code: int
@@ -54,6 +61,20 @@ class UpName(BaseModel):
 
     token: str
     name: str
+
+
+class UpUsername(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    token: str
+    username: str
+
+
+class UpProfileImage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    token: str
+    profile_image: str | None = None
 
 
 class ValidToken(BaseModel):

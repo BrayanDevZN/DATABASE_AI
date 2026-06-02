@@ -23,7 +23,7 @@ class Login:
         with engine.connect() as session:
             data = session.execute(
             text("""
-                SELECT user_id, name, age, gender, email, password, role, status
+                SELECT user_id, name, username, age, gender, email, password, role, status, profile_image
                 FROM users
                 WHERE email = :email
             """),
@@ -35,12 +35,14 @@ class Login:
             return {
                 "user_id": user[0],
                 "name": user[1],
-                "age": user[2],
-                "gender": user[3],
-                "email": user[4],
-                "password": user[5],
-                "role": user[6],
-                "status": user[7]
+                "username": user[2],
+                "age": user[3],
+                "gender": user[4],
+                "email": user[5],
+                "password": user[6],
+                "role": user[7],
+                "status": user[8],
+                "profile_image": user[9]
             } if user is not None else None
             
     def valid_pass(self) -> bool:
@@ -56,7 +58,7 @@ class Login:
         if not self.valid_pass():
             return {"exists":True, "status": False, "token":None}
         token = data.token(email=self.db["email"], user_id=self.db["user_id"], role=self.db["role"], status=self.db["status"])
-        return {"exists":True, "status": True, "token":token, "name": self.db["name"], "gender": self.db["gender"], "age":self.db["age"]}
+        return {"exists":True, "status": True, "token":token, "name": self.db["name"], "username": self.db["username"], "profile_image": self.db["profile_image"], "gender": self.db["gender"], "age":self.db["age"]}
  
     
 class valid_jwt:
@@ -76,25 +78,3 @@ class valid_jwt:
             "is_valid": self.check_jwt(),
             "token": self.token
         }
-        
-        
-
-        
-        
-        
-    
-            
-
-            
-        
-                
-            
-            
-        
-        
-        
-        
-        
-    
-        
-        

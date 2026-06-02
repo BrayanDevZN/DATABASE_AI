@@ -48,6 +48,7 @@ class create_User:
         user = Model_user(
             email=Data["email"],
             name=Data["name"],
+            username=Data["username"],
             password=Data["password"], 
             age=Data["age"],
             gender=Data["gender"]
@@ -63,6 +64,7 @@ class create_User:
         if valid_code["status"] and not valid_code["expired"]:
             Service().create_account(
                 name=user.name,
+                username=user.username,
                 email=user.email,
                 password=user.password,
                 age=user.age,
@@ -77,6 +79,10 @@ class create_User:
     def valid_user(self, data:dict) -> bool:
         user = Model_user(email=data["email"]).email
         return {"exists": RepositoryAccount().select_by_email(user) is not None} 
+
+    def valid_username(self, data: dict) -> dict:
+        username = Model_user(username=data["username"]).username
+        return {"exists": RepositoryAccount().select_by_username(username) is not None}
         
     
 class User_Login:
@@ -221,6 +227,33 @@ class User_Login:
         )
 
         return result
+
+    def update_username(self, data: dict) -> dict:
+        token = Model_user(token=data["token"]).token
+        new_username = Model_user(username=data["username"]).username
+
+        valid_token = valid_jwt(token).validation()
+
+        if not valid_token["is_valid"]:
+            return {"status": False}
+
+        return Service().update_username(
+            new_username=new_username,
+            token=token
+        )
+
+    def update_profile_image(self, data: dict) -> dict:
+        token = Model_user(token=data["token"]).token
+
+        valid_token = valid_jwt(token).validation()
+
+        if not valid_token["is_valid"]:
+            return {"status": False}
+
+        return Service().update_profile_image(
+            profile_image=data.get("profile_image"),
+            token=token
+        )
     
     def valid_token(self, token:str) -> dict:
      
@@ -255,19 +288,3 @@ class User_Login:
         return {
             "status": deleted
         }
-        
-    
-    
-
-            
-        
-        
-
-
-        
-        
-    
-        
-    
-        
-        
