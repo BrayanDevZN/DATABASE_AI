@@ -129,11 +129,13 @@ class ManagerCharts:
         user_id: int,
         dashboard_id: int,
         ai_suggestion: str,
-        charts: list[dict]
+        charts: list[dict],
+        prompt: str | None = None
     ) -> dict:
         return self.service.finish_dashboard_refresh(
             user_id=user_id,
             dashboard_id=dashboard_id,
             ai_suggestion=ai_suggestion,
-            charts=charts
+            charts=charts,
+            prompt=prompt
         )

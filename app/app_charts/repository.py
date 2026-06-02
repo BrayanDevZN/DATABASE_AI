@@ -385,7 +385,8 @@ class RepositoryCharts:
         self,
         user_id: int,
         dashboard_id: int,
-        ai_suggestion: str
+        ai_suggestion: str,
+        prompt: str | None = None
     ) -> dict | None:
 
         with self.db.connect() as session:
@@ -394,6 +395,7 @@ class RepositoryCharts:
                     UPDATE dashboards
                     SET
                         ai_suggestion = :ai_suggestion,
+                        prompt = COALESCE(:prompt, prompt),
                         is_outdated = FALSE,
                         updated_at = NOW()
                     WHERE id = :dashboard_id
@@ -403,7 +405,8 @@ class RepositoryCharts:
                 {
                     "user_id": user_id,
                     "dashboard_id": dashboard_id,
-                    "ai_suggestion": ai_suggestion
+                    "ai_suggestion": ai_suggestion,
+                    "prompt": prompt
                 }
             )
 

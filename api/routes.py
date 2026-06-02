@@ -361,6 +361,7 @@ def finish_dashboard_refresh(data: dict = Body(...)):
     dashboard_id = data.get("dashboard_id")
     ai_suggestion = data.get("ai_suggestion")
     charts = data.get("charts")
+    prompt = data.get("prompt")
 
     if not token:
         raise ValueError("token é obrigatório.")
@@ -381,6 +382,7 @@ def finish_dashboard_refresh(data: dict = Body(...)):
         dashboard_id=int(dashboard_id),
         ai_suggestion=ai_suggestion,
         charts=charts,
+        prompt=prompt,
     )
 
     return {"dashboard": dashboard}

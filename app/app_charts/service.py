@@ -196,7 +196,8 @@ class ServiceCharts:
         user_id: int,
         dashboard_id: int,
         ai_suggestion: str,
-        charts: list[dict]
+        charts: list[dict],
+        prompt: str | None = None
     ) -> dict:
         dashboard = self.repo.select_dashboard(
             user_id=user_id,
@@ -215,13 +216,15 @@ class ServiceCharts:
             updated_dashboard = self.repo.update_dashboard_after_refresh(
                 user_id=user_id,
                 dashboard_id=dashboard_id,
-                ai_suggestion=ai_suggestion
+                ai_suggestion=ai_suggestion,
+                prompt=prompt
             )
         else:
             updated_dashboard = dashboard
 
         updated_dashboard["charts"] = created_charts
         updated_dashboard["ai_suggestion"] = ai_suggestion
+        updated_dashboard["prompt"] = prompt if prompt is not None else dashboard.get("prompt", "")
         updated_dashboard["is_outdated"] = False
 
         return updated_dashboard
