@@ -13,7 +13,7 @@ class RepositoryCharts:
         self,
         user_id: int,
         title: str,
-        prompt: str,
+        prompt: str | None,
         ai_suggestion: str | None,
         file_name: str | None,
         data_source_id: int | None = None
@@ -44,7 +44,7 @@ class RepositoryCharts:
                 {
                     "user_id": user_id,
                     "title": title,
-                    "prompt": prompt,
+                    "prompt": prompt or "",
                     "ai_suggestion": ai_suggestion,
                     "file_name": file_name,
                     "data_source_id": data_source_id

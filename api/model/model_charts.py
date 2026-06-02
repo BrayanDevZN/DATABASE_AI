@@ -13,8 +13,7 @@ class GenerateDashboard(BaseModel):
 
     token: str = Field(min_length=1)
     title: str = Field(min_length=1)
-    prompt: str = Field(min_length=1)
-
+    prompt: str | None = None
 
 class GetDashboard(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -33,9 +32,9 @@ class DeleteDashboard(BaseModel):
 class CreateDashboard(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    token: str
+    token: str = Field(min_length=1)
     title: str = Field(min_length=1)
-    prompt: str = Field(min_length=1)
+    prompt: str | None = None
     ai_suggestion: str | None = None
     file_name: str | None = None
     data_source_id: int | None = Field(default=None, gt=0)
@@ -95,7 +94,7 @@ class DashboardResponse(BaseModel):
     user_id: int
 
     title: str
-    prompt: str
+    prompt: str | None = None
 
     ai_suggestion: str | None = None
     file_name: str | None = None
