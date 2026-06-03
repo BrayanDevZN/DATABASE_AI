@@ -67,26 +67,25 @@ class RepositoryDataSources:
 
     def ensure_external_source_columns(self) -> None:
         with self.db.connect() as session:
-            session.execute(
-                text("""
-                    ALTER TABLE data_sources
-                    ADD COLUMN IF NOT EXISTS source_type VARCHAR(20) NOT NULL DEFAULT 'file',
-                    ADD COLUMN IF NOT EXISTS connection_config JSONB NOT NULL DEFAULT '{}'::jsonb,
-                    ADD COLUMN IF NOT EXISTS refresh_interval_days INTEGER,
-                    ADD COLUMN IF NOT EXISTS last_synced_at TIMESTAMP,
-                    ADD COLUMN IF NOT EXISTS next_sync_at TIMESTAMP
-                """)
-            )
+            for statement in (
+                "ALTER TABLE data_sources ADD COLUMN IF NOT EXISTS source_type VARCHAR(20) NOT NULL DEFAULT 'file'",
+                "ALTER TABLE data_sources ADD COLUMN IF NOT EXISTS connection_config JSONB NOT NULL DEFAULT CAST('{}' AS JSONB)",
+                "ALTER TABLE data_sources ADD COLUMN IF NOT EXISTS refresh_interval_days INTEGER",
+                "ALTER TABLE data_sources ADD COLUMN IF NOT EXISTS last_synced_at TIMESTAMP",
+                "ALTER TABLE data_sources ADD COLUMN IF NOT EXISTS next_sync_at TIMESTAMP",
+            ):
+                session.execute(text(statement))
+
             session.execute(
                 text("""
                     UPDATE data_sources
                     SET
                         source_type = COALESCE(NULLIF(source_type, ''), 'file'),
-                        connection_config = COALESCE(connection_config, '{}'::jsonb),
+                        connection_config = COALESCE(connection_config, CAST('{}' AS JSONB)),
                         last_synced_at = COALESCE(last_synced_at, updated_at),
                         next_sync_at = CASE
                             WHEN refresh_interval_days IS NULL THEN next_sync_at
-                            ELSE COALESCE(next_sync_at, updated_at + (refresh_interval_days || ' days')::interval)
+                            ELSE COALESCE(next_sync_at, updated_at + CAST(refresh_interval_days || ' days' AS INTERVAL))
                         END
                 """)
             )
@@ -149,7 +148,7 @@ class RepositoryDataSources:
                         NOW(),
                         CASE
                             WHEN CAST(:refresh_interval_days AS INTEGER) IS NULL THEN NULL
-                            ELSE NOW() + (CAST(:refresh_interval_days AS INTEGER) || ' days')::interval
+                            ELSE NOW() + CAST(CAST(:refresh_interval_days AS INTEGER) || ' days' AS INTERVAL)
                         END
                     )
                     RETURNING
@@ -270,7 +269,7 @@ class RepositoryDataSources:
                         last_synced_at = NOW(),
                         next_sync_at = CASE
                             WHEN CAST(:refresh_interval_days AS INTEGER) IS NULL THEN NULL
-                            ELSE NOW() + (CAST(:refresh_interval_days AS INTEGER) || ' days')::interval
+                            ELSE NOW() + CAST(CAST(:refresh_interval_days AS INTEGER) || ' days' AS INTERVAL)
                         END,
                         updated_at = NOW()
                     WHERE id = :data_source_id

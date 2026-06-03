@@ -371,7 +371,7 @@ class ManagerCollaborations:
         with self.db.connect() as session:
             rows = session.execute(
                 text("""
-                    SELECT NULL::INTEGER AS id, 'owner' AS permission, 'accepted' AS status,
+                    SELECT CAST(NULL AS INTEGER) AS id, 'owner' AS permission, 'accepted' AS status,
                         u.user_id, u.name, u.username, u.profile_image
                     FROM dashboards d
                     JOIN users u ON u.user_id = d.user_id
