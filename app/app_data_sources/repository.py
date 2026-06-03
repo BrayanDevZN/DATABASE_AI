@@ -152,7 +152,20 @@ class RepositoryDataSources:
                             ELSE NOW() + (:refresh_interval_days || ' days')::interval
                         END
                     )
-                    RETURNING *
+                    RETURNING
+                        id,
+                        user_id,
+                        name,
+                        file_name,
+                        source_type,
+                        connection_config,
+                        refresh_interval_days,
+                        last_synced_at,
+                        next_sync_at,
+                        row_count,
+                        column_count,
+                        created_at,
+                        updated_at
                 """),
                 {
                     "user_id": user_id,
@@ -262,7 +275,20 @@ class RepositoryDataSources:
                         updated_at = NOW()
                     WHERE id = :data_source_id
                     AND user_id = :user_id
-                    RETURNING *
+                    RETURNING
+                        id,
+                        user_id,
+                        name,
+                        file_name,
+                        source_type,
+                        connection_config,
+                        refresh_interval_days,
+                        last_synced_at,
+                        next_sync_at,
+                        row_count,
+                        column_count,
+                        created_at,
+                        updated_at
                 """),
                 {
                     "user_id": user_id,
