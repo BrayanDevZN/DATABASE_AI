@@ -12,7 +12,10 @@ class ManagerDataSources:
         file_name: str,
         file_data: list[dict],
         row_count: int,
-        column_count: int
+        column_count: int,
+        source_type: str = "file",
+        connection_config: dict | None = None,
+        refresh_interval_days: int | None = None
     ) -> dict | None:
         return self.service.create_data_source(
             user_id=user_id,
@@ -20,7 +23,10 @@ class ManagerDataSources:
             file_name=file_name,
             file_data=file_data,
             row_count=row_count,
-            column_count=column_count
+            column_count=column_count,
+            source_type=source_type,
+            connection_config=connection_config,
+            refresh_interval_days=refresh_interval_days
         )
 
     def select_data_sources_by_user(
@@ -48,7 +54,10 @@ class ManagerDataSources:
         file_name: str,
         file_data: list[dict],
         row_count: int,
-        column_count: int
+        column_count: int,
+        source_type: str | None = None,
+        connection_config: dict | None = None,
+        refresh_interval_days: int | None = None
     ) -> dict | None:
         return self.service.update_data_source(
             user_id=user_id,
@@ -56,8 +65,14 @@ class ManagerDataSources:
             file_name=file_name,
             file_data=file_data,
             row_count=row_count,
-            column_count=column_count
+            column_count=column_count,
+            source_type=source_type,
+            connection_config=connection_config,
+            refresh_interval_days=refresh_interval_days
         )
+
+    def select_due_data_sources_by_user(self, user_id: int) -> list[dict]:
+        return self.service.select_due_data_sources_by_user(user_id=user_id)
 
     def rename_data_source(
         self,

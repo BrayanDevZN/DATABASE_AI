@@ -8,18 +8,25 @@ class ManagerCollaborations:
         self.db = main_database()
 
     def search_users(self, user_id: int, query: str) -> list[dict]:
+        clean_query = query.strip().lstrip("@")
         with self.db.connect() as session:
             rows = session.execute(
                 text("""
                     SELECT user_id, name, username, profile_image
                     FROM users
-                    WHERE user_id <> :user_id AND username ILIKE :query
+                    WHERE user_id <> :user_id
+                    AND (username ILIKE :query OR name ILIKE :query)
                     ORDER BY
                         CASE WHEN LOWER(username) = LOWER(:exact_query) THEN 0 ELSE 1 END,
+                        CASE WHEN LOWER(name) = LOWER(:exact_query) THEN 0 ELSE 1 END,
                         username
                     LIMIT 8
                 """),
-                {"user_id": user_id, "query": f"%{query.strip()}%", "exact_query": query.strip()}
+                {
+                    "user_id": user_id,
+                    "query": f"%{clean_query}%",
+                    "exact_query": clean_query,
+                }
             ).fetchall()
         return [dict(row._mapping) for row in rows]
 
@@ -241,10 +248,12 @@ class ManagerCollaborations:
         with self.db.connect() as session:
             rows = session.execute(
                 text("""
-                    SELECT id, collaboration_id, message, notification_type, is_read, created_at
-                    FROM collaboration_notifications
-                    WHERE user_id = :user_id
-                    ORDER BY created_at DESC
+                    SELECT cn.id, cn.collaboration_id, dc.dashboard_id,
+                        cn.message, cn.notification_type, cn.is_read, cn.created_at
+                    FROM collaboration_notifications cn
+                    LEFT JOIN dashboard_collaborations dc ON dc.id = cn.collaboration_id
+                    WHERE cn.user_id = :user_id
+                    ORDER BY cn.created_at DESC
                     LIMIT 30
                 """),
                 {"user_id": user_id}

@@ -2,9 +2,11 @@ import io
 from datetime import date, datetime
 
 import pandas as pd
+import requests
 
 from fastapi import Body, FastAPI, File, Form, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import create_engine, text
 
 import api.model.model_accounts as models
 import api.model.model_conversation as conversation_models
@@ -95,6 +97,170 @@ def read_uploaded_file(file: UploadFile) -> tuple[list[dict], int, int]:
     column_count = len(df.columns)
 
     return file_data, row_count, column_count
+
+
+def normalize_rows(rows) -> tuple[list[dict], int, int]:
+    if isinstance(rows, dict):
+        for key in ("data", "results", "items", "rows"):
+            if isinstance(rows.get(key), list):
+                rows = rows[key]
+                break
+        else:
+            rows = [rows]
+
+    if not isinstance(rows, list):
+        raise ValueError("A fonte precisa retornar uma lista de registros.")
+
+    df = pd.DataFrame(rows)
+    df = df.dropna(how="all")
+    df = df.where(pd.notnull(df), None)
+
+    for column in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[column]):
+            df[column] = df[column].astype(str)
+
+    file_data = make_json_safe(df.to_dict(orient="records"))
+    row_count = len(df)
+    column_count = len(df.columns)
+
+    return file_data, row_count, column_count
+
+
+def read_web_source(url: str) -> tuple[list[dict], int, int]:
+    if not url or not url.strip():
+        raise ValueError("URL da API e obrigatoria.")
+
+    response = requests.get(url.strip(), timeout=30)
+    response.raise_for_status()
+
+    return normalize_rows(response.json())
+
+
+def read_database_source(database_url: str, query: str) -> tuple[list[dict], int, int]:
+    if not database_url or not database_url.strip():
+        raise ValueError("URL de conexao do banco e obrigatoria.")
+
+    if not query or not query.strip():
+        raise ValueError("Query do banco e obrigatoria.")
+
+    clean_query = query.strip()
+
+    if not clean_query.lower().startswith("select"):
+        raise ValueError("Use apenas consultas SELECT para fontes de banco.")
+
+    engine = create_engine(database_url.strip(), pool_pre_ping=True)
+
+    with engine.connect() as session:
+        rows = session.execute(text(clean_query)).mappings().all()
+
+    return normalize_rows([dict(row) for row in rows])
+
+
+def normalize_refresh_interval(value: int | str | None) -> int | None:
+    if value in (None, ""):
+        return None
+
+    days = int(value)
+
+    if days < 1:
+        raise ValueError("O limite de atualizacao precisa ser de pelo menos 1 dia.")
+
+    return days
+
+
+def build_connection_config(
+    source_type: str,
+    api_url: str | None = None,
+    database_url: str | None = None,
+    query: str | None = None,
+) -> dict:
+    if source_type == "web":
+        return {"url": (api_url or "").strip()}
+
+    if source_type == "database":
+        return {
+            "database_url": (database_url or "").strip(),
+            "query": (query or "").strip(),
+        }
+
+    return {}
+
+
+def read_source_payload(
+    source_type: str,
+    file: UploadFile | None = None,
+    api_url: str | None = None,
+    database_url: str | None = None,
+    query: str | None = None,
+) -> tuple[list[dict], int, int, str]:
+    if source_type == "file":
+        if not file:
+            raise ValueError("Arquivo e obrigatorio para fonte do tipo arquivo.")
+
+        file_data, row_count, column_count = read_uploaded_file(file)
+        return file_data, row_count, column_count, file.filename
+
+    if source_type == "web":
+        file_data, row_count, column_count = read_web_source(api_url or "")
+        return file_data, row_count, column_count, api_url or "API externa"
+
+    if source_type == "database":
+        file_data, row_count, column_count = read_database_source(database_url or "", query or "")
+        return file_data, row_count, column_count, "Banco de dados"
+
+    raise ValueError("Tipo de fonte invalido.")
+
+
+def sync_due_data_sources(user_id: int) -> list[dict]:
+    manager_data_sources = data_source_manager.ManagerDataSources()
+    synced = []
+
+    for source in manager_data_sources.select_due_data_sources_by_user(user_id):
+        config = source.get("connection_config") or {}
+        source_type = source.get("source_type")
+
+        try:
+            file_data, row_count, column_count, file_name = read_source_payload(
+                source_type=source_type,
+                api_url=config.get("url"),
+                database_url=config.get("database_url"),
+                query=config.get("query"),
+            )
+
+            updated_source = manager_data_sources.update_data_source(
+                user_id=user_id,
+                data_source_id=source["id"],
+                file_name=file_name,
+                file_data=file_data,
+                row_count=row_count,
+                column_count=column_count,
+                source_type=source_type,
+                connection_config=config,
+                refresh_interval_days=source.get("refresh_interval_days"),
+            )
+
+            dashboards = charts_manager.ManagerCharts().select_dashboards_by_data_source(
+                user_id=user_id,
+                data_source_id=source["id"],
+            )
+
+            if dashboards:
+                charts_manager.ManagerCharts().mark_dashboards_outdated_by_data_source(
+                    data_source_id=source["id"],
+                )
+
+            synced.append({
+                "data_source": updated_source,
+                "dashboards": dashboards,
+            })
+        except Exception as error:
+            synced.append({
+                "data_source": source,
+                "dashboards": [],
+                "error": str(error),
+            })
+
+    return synced
 
 
 @app.post("/create_user", status_code=status.HTTP_201_CREATED)
@@ -200,17 +366,41 @@ def create_empty_conversation(data: conversation_models.CreateConversation):
 # DATA SOURCES
 
 @app.post("/data-source/create", status_code=status.HTTP_201_CREATED)
-def create_data_source(token: str = Form(...), name: str = Form(...), file: UploadFile = File(...)):
+def create_data_source(
+    token: str = Form(...),
+    name: str = Form(...),
+    source_type: str = Form("file"),
+    refresh_interval_days: int | None = Form(None),
+    api_url: str | None = Form(None),
+    database_url: str | None = Form(None),
+    query: str | None = Form(None),
+    file: UploadFile | None = File(None),
+):
     user_id = get_user_id_from_token(token)
-    file_data, row_count, column_count = read_uploaded_file(file)
+    refresh_interval_days = normalize_refresh_interval(refresh_interval_days)
+    file_data, row_count, column_count, file_name = read_source_payload(
+        source_type=source_type,
+        file=file,
+        api_url=api_url,
+        database_url=database_url,
+        query=query,
+    )
 
     data_source = data_source_manager.ManagerDataSources().create_data_source(
         user_id=user_id,
         name=name,
-        file_name=file.filename,
+        file_name=file_name,
         file_data=file_data,
         row_count=row_count,
         column_count=column_count,
+        source_type=source_type,
+        connection_config=build_connection_config(
+            source_type=source_type,
+            api_url=api_url,
+            database_url=database_url,
+            query=query,
+        ),
+        refresh_interval_days=refresh_interval_days,
     )
 
     return {"data_source": data_source}
@@ -219,11 +409,18 @@ def create_data_source(token: str = Form(...), name: str = Form(...), file: Uplo
 @app.post("/data-sources", status_code=status.HTTP_200_OK)
 def select_data_sources(data: data_source_models.WithToken):
     user_id = get_user_id_from_token(data.token)
+    synced_sources = sync_due_data_sources(user_id)
     owned = data_source_manager.ManagerDataSources().select_data_sources_by_user(user_id=user_id)
     shared = collaborations.select_shared_data_sources(user_id)
 
     return {
-        "data_sources": owned + shared
+        "data_sources": owned + shared,
+        "synced_sources": synced_sources,
+        "auto_refresh_dashboards": [
+            dashboard
+            for synced_source in synced_sources
+            for dashboard in synced_source.get("dashboards", [])
+        ],
     }
 
 
@@ -272,7 +469,12 @@ def update_data_source(
     token: str = Form(...),
     data_source_id: int = Form(...),
     refresh_dashboards: bool = Form(False),
-    file: UploadFile = File(...),
+    source_type: str | None = Form(None),
+    refresh_interval_days: int | None = Form(None),
+    api_url: str | None = Form(None),
+    database_url: str | None = Form(None),
+    query: str | None = Form(None),
+    file: UploadFile | None = File(None),
 ):
     user_id = get_user_id_from_token(token)
     access = collaborations.select_data_source_access(user_id, data_source_id)
@@ -289,15 +491,42 @@ def update_data_source(
             if (collaborations.select_dashboard_access(user_id, dashboard["id"]) or {}).get("access_permission") == "full"
         ]
 
-    file_data, row_count, column_count = read_uploaded_file(file)
+    current_source = data_source_manager.ManagerDataSources().select_data_source(
+        user_id=access["owner_user_id"],
+        data_source_id=data_source_id,
+    )
+
+    if not current_source:
+        raise ValueError("Fonte de dados nao encontrada.")
+
+    next_source_type = source_type or current_source.get("source_type") or "file"
+    current_config = current_source.get("connection_config") or {}
+    next_config = build_connection_config(
+        source_type=next_source_type,
+        api_url=api_url if api_url is not None else current_config.get("url"),
+        database_url=database_url if database_url is not None else current_config.get("database_url"),
+        query=query if query is not None else current_config.get("query"),
+    )
+    next_refresh_interval_days = normalize_refresh_interval(refresh_interval_days)
+
+    file_data, row_count, column_count, file_name = read_source_payload(
+        source_type=next_source_type,
+        file=file,
+        api_url=next_config.get("url"),
+        database_url=next_config.get("database_url"),
+        query=next_config.get("query"),
+    )
 
     data_source = data_source_manager.ManagerDataSources().update_data_source(
         user_id=access["owner_user_id"],
         data_source_id=data_source_id,
-        file_name=file.filename,
+        file_name=file_name,
         file_data=file_data,
         row_count=row_count,
         column_count=column_count,
+        source_type=next_source_type,
+        connection_config=next_config,
+        refresh_interval_days=next_refresh_interval_days,
     )
 
     if refresh_dashboards and linked_dashboards:

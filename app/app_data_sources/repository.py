@@ -71,7 +71,10 @@ class RepositoryDataSources:
         file_name: str,
         file_data: list[dict],
         row_count: int,
-        column_count: int
+        column_count: int,
+        source_type: str = "file",
+        connection_config: dict | None = None,
+        refresh_interval_days: int | None = None
     ) -> dict | None:
         with self.db.connect() as session:
             result = session.execute(
@@ -82,7 +85,12 @@ class RepositoryDataSources:
                         file_name,
                         file_data,
                         row_count,
-                        column_count
+                        column_count,
+                        source_type,
+                        connection_config,
+                        refresh_interval_days,
+                        last_synced_at,
+                        next_sync_at
                     )
                     VALUES (
                         :user_id,
@@ -90,7 +98,15 @@ class RepositoryDataSources:
                         :file_name,
                         CAST(:file_data AS JSONB),
                         :row_count,
-                        :column_count
+                        :column_count,
+                        :source_type,
+                        CAST(:connection_config AS JSONB),
+                        :refresh_interval_days,
+                        NOW(),
+                        CASE
+                            WHEN :refresh_interval_days IS NULL THEN NULL
+                            ELSE NOW() + (:refresh_interval_days || ' days')::interval
+                        END
                     )
                     RETURNING *
                 """),
@@ -101,6 +117,9 @@ class RepositoryDataSources:
                     "file_data": self._json_dumps(file_data),
                     "row_count": row_count,
                     "column_count": column_count,
+                    "source_type": source_type,
+                    "connection_config": self._json_dumps(connection_config or {}),
+                    "refresh_interval_days": refresh_interval_days,
                 }
             )
 
@@ -121,6 +140,11 @@ class RepositoryDataSources:
                         user_id,
                         name,
                         file_name,
+                        source_type,
+                        connection_config,
+                        refresh_interval_days,
+                        last_synced_at,
+                        next_sync_at,
                         row_count,
                         column_count,
                         created_at,
@@ -169,7 +193,10 @@ class RepositoryDataSources:
         file_name: str,
         file_data: list[dict],
         row_count: int,
-        column_count: int
+        column_count: int,
+        source_type: str | None = None,
+        connection_config: dict | None = None,
+        refresh_interval_days: int | None = None
     ) -> dict | None:
         with self.db.connect() as session:
             result = session.execute(
@@ -180,6 +207,14 @@ class RepositoryDataSources:
                         file_data = CAST(:file_data AS JSONB),
                         row_count = :row_count,
                         column_count = :column_count,
+                        source_type = COALESCE(:source_type, source_type),
+                        connection_config = COALESCE(CAST(:connection_config AS JSONB), connection_config),
+                        refresh_interval_days = :refresh_interval_days,
+                        last_synced_at = NOW(),
+                        next_sync_at = CASE
+                            WHEN :refresh_interval_days IS NULL THEN NULL
+                            ELSE NOW() + (:refresh_interval_days || ' days')::interval
+                        END,
                         updated_at = NOW()
                     WHERE id = :data_source_id
                     AND user_id = :user_id
@@ -192,6 +227,9 @@ class RepositoryDataSources:
                     "file_data": self._json_dumps(file_data),
                     "row_count": row_count,
                     "column_count": column_count,
+                    "source_type": source_type,
+                    "connection_config": self._json_dumps(connection_config) if connection_config is not None else None,
+                    "refresh_interval_days": refresh_interval_days,
                 }
             )
 
@@ -199,6 +237,26 @@ class RepositoryDataSources:
             data_source = result.fetchone()
 
         return self._row_to_dict(data_source)
+
+    def select_due_data_sources_by_user(self, user_id: int) -> list[dict]:
+        with self.db.connect() as session:
+            result = session.execute(
+                text("""
+                    SELECT *
+                    FROM data_sources
+                    WHERE user_id = :user_id
+                    AND source_type IN ('web', 'database')
+                    AND refresh_interval_days IS NOT NULL
+                    AND next_sync_at IS NOT NULL
+                    AND next_sync_at <= NOW()
+                    ORDER BY next_sync_at ASC
+                """),
+                {"user_id": user_id}
+            )
+
+            rows = result.fetchall()
+
+        return [self._row_to_dict(row) for row in rows]
 
     def rename_data_source(
         self,
