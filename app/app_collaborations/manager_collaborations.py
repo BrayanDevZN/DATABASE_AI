@@ -6,6 +6,42 @@ from connect.manager_database import main_database
 class ManagerCollaborations:
     def __init__(self) -> None:
         self.db = main_database()
+        self.ensure_notification_columns()
+
+    def ensure_notification_columns(self) -> None:
+        with self.db.connect() as session:
+            session.execute(
+                text("""
+                    CREATE TABLE IF NOT EXISTS collaboration_notifications (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+                        collaboration_id INTEGER REFERENCES dashboard_collaborations(id) ON DELETE SET NULL,
+                        message TEXT NOT NULL,
+                        notification_type VARCHAR(40) NOT NULL,
+                        is_read BOOLEAN NOT NULL DEFAULT FALSE,
+                        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+                    )
+                """)
+            )
+            session.execute(
+                text("""
+                    ALTER TABLE collaboration_notifications
+                    ADD COLUMN IF NOT EXISTS dashboard_id INTEGER REFERENCES dashboards(id) ON DELETE SET NULL
+                """)
+            )
+            session.execute(
+                text("""
+                    ALTER TABLE collaboration_notifications
+                    ALTER COLUMN notification_type TYPE VARCHAR(40)
+                """)
+            )
+            session.execute(
+                text("""
+                    CREATE INDEX IF NOT EXISTS collaboration_notifications_user_idx
+                    ON collaboration_notifications (user_id, created_at DESC)
+                """)
+            )
+            session.commit()
 
     def search_users(self, user_id: int, query: str) -> list[dict]:
         clean_query = query.strip().lstrip("@")
@@ -248,7 +284,8 @@ class ManagerCollaborations:
         with self.db.connect() as session:
             rows = session.execute(
                 text("""
-                    SELECT cn.id, cn.collaboration_id, dc.dashboard_id,
+                    SELECT cn.id, cn.collaboration_id,
+                        COALESCE(cn.dashboard_id, dc.dashboard_id) AS dashboard_id,
                         cn.message, cn.notification_type, cn.is_read, cn.created_at
                     FROM collaboration_notifications cn
                     LEFT JOIN dashboard_collaborations dc ON dc.id = cn.collaboration_id
@@ -259,6 +296,61 @@ class ManagerCollaborations:
                 {"user_id": user_id}
             ).fetchall()
         return [dict(row._mapping) for row in rows]
+
+    def create_notification(
+        self,
+        user_id: int,
+        message: str,
+        notification_type: str,
+        dashboard_id: int | None = None,
+        collaboration_id: int | None = None,
+    ) -> dict | None:
+        with self.db.connect() as session:
+            row = session.execute(
+                text("""
+                    INSERT INTO collaboration_notifications
+                        (user_id, collaboration_id, dashboard_id, message, notification_type)
+                    VALUES
+                        (:user_id, :collaboration_id, :dashboard_id, :message, :notification_type)
+                    RETURNING *
+                """),
+                {
+                    "user_id": user_id,
+                    "collaboration_id": collaboration_id,
+                    "dashboard_id": dashboard_id,
+                    "message": message,
+                    "notification_type": notification_type,
+                }
+            ).fetchone()
+            session.commit()
+
+        return dict(row._mapping) if row else None
+
+    def notify_dashboard_refreshed(
+        self,
+        owner_user_id: int,
+        dashboard_id: int,
+        dashboard_title: str,
+        source_name: str,
+    ) -> None:
+        recipients = {owner_user_id}
+
+        for access in self.list_dashboard_access(owner_user_id, dashboard_id):
+            if access.get("status") == "accepted":
+                recipients.add(access["user_id"])
+
+        message = (
+            f'O dashboard "{dashboard_title}" foi atualizado automaticamente '
+            f'porque a fonte "{source_name}" atingiu o limite de dias.'
+        )
+
+        for user_id in recipients:
+            self.create_notification(
+                user_id=user_id,
+                dashboard_id=dashboard_id,
+                message=message,
+                notification_type="dashboard_auto_refresh",
+            )
 
     def mark_notification_read(self, user_id: int, notification_id: int) -> bool:
         with self.db.connect() as session:

@@ -1,5 +1,6 @@
 import io
 import json
+import os
 from datetime import date, datetime
 
 import pandas as pd
@@ -26,6 +27,7 @@ from auth.jwt import JWT
 
 app = FastAPI()
 collaborations = ManagerCollaborations()
+AI_URL = os.getenv("AI_URL", "https://web-production-40ead.up.railway.app")
 
 app.add_middleware(
     CORSMiddleware,
@@ -228,7 +230,94 @@ def read_source_payload(
     raise ValueError("Tipo de fonte invalido.")
 
 
-def sync_due_data_sources(user_id: int) -> list[dict]:
+def analyze_dashboard_refresh_with_ai(
+    token: str,
+    dashboard: dict,
+) -> dict:
+    form_data = {
+        "token": token,
+        "title": dashboard.get("title") or "Dashboard",
+        "prompt": dashboard.get("prompt") or "",
+        "data_source_id": str(dashboard["data_source_id"]),
+    }
+
+    response = requests.post(
+        f"{AI_URL}/dashboard/refresh/analyze",
+        data=form_data,
+        timeout=180,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def refresh_linked_dashboards_after_source_sync(
+    token: str,
+    user_id: int,
+    source: dict,
+    dashboards: list[dict],
+) -> list[dict]:
+    refreshed_dashboards = []
+    chart_manager = charts_manager.ManagerCharts()
+
+    for dashboard in dashboards:
+        try:
+            analysis = analyze_dashboard_refresh_with_ai(
+                token=token,
+                dashboard=dashboard,
+            )
+            charts = (
+                analysis.get("charts")
+                or analysis.get("dashboard", {}).get("charts")
+                or []
+            )
+            ai_suggestion = (
+                analysis.get("ai_suggestion")
+                or analysis.get("dashboard", {}).get("ai_suggestion")
+                or analysis.get("answer")
+                or ""
+            )
+
+            if not charts:
+                raise ValueError("A IA nao retornou graficos para o dashboard.")
+
+            refreshed_dashboard = chart_manager.finish_dashboard_refresh(
+                user_id=user_id,
+                dashboard_id=dashboard["id"],
+                ai_suggestion=ai_suggestion,
+                charts=charts,
+                prompt=dashboard.get("prompt"),
+            )
+
+            collaborations.notify_dashboard_refreshed(
+                owner_user_id=user_id,
+                dashboard_id=dashboard["id"],
+                dashboard_title=dashboard.get("title") or "Dashboard",
+                source_name=source.get("name") or "Fonte de dados",
+            )
+            refreshed_dashboards.append(refreshed_dashboard)
+        except Exception as error:
+            chart_manager.mark_dashboards_outdated_by_data_source(
+                data_source_id=source["id"],
+            )
+            collaborations.create_notification(
+                user_id=user_id,
+                dashboard_id=dashboard.get("id"),
+                message=(
+                    f'Nao foi possivel atualizar automaticamente o dashboard '
+                    f'"{dashboard.get("title", "Dashboard")}" da fonte '
+                    f'"{source.get("name", "Fonte de dados")}". Atualize manualmente.'
+                ),
+                notification_type="dashboard_auto_refresh_failed",
+            )
+            refreshed_dashboards.append({
+                "dashboard": dashboard,
+                "error": str(error),
+            })
+
+    return refreshed_dashboards
+
+
+def sync_due_data_sources(user_id: int, token: str) -> list[dict]:
     manager_data_sources = data_source_manager.ManagerDataSources()
     synced = []
 
@@ -261,14 +350,20 @@ def sync_due_data_sources(user_id: int) -> list[dict]:
                 data_source_id=source["id"],
             )
 
+            refreshed_dashboards = []
+
             if dashboards:
-                charts_manager.ManagerCharts().mark_dashboards_outdated_by_data_source(
-                    data_source_id=source["id"],
+                refreshed_dashboards = refresh_linked_dashboards_after_source_sync(
+                    token=token,
+                    user_id=user_id,
+                    source=updated_source or source,
+                    dashboards=dashboards,
                 )
 
             synced.append({
                 "data_source": updated_source,
                 "dashboards": dashboards,
+                "refreshed_dashboards": refreshed_dashboards,
             })
         except Exception as error:
             synced.append({
@@ -431,7 +526,7 @@ def create_data_source(
 @app.post("/data-sources", status_code=status.HTTP_200_OK)
 def select_data_sources(data: data_source_models.WithToken):
     user_id = get_user_id_from_token(data.token)
-    synced_sources = sync_due_data_sources(user_id)
+    synced_sources = sync_due_data_sources(user_id, data.token)
     owned = data_source_manager.ManagerDataSources().select_data_sources_by_user(user_id=user_id)
     shared = collaborations.select_shared_data_sources(user_id)
 

@@ -16,6 +16,12 @@ CREATE INDEX IF NOT EXISTS collaboration_notifications_user_idx
 ON collaboration_notifications (user_id, created_at DESC);
 
 ALTER TABLE collaboration_notifications
+ADD COLUMN IF NOT EXISTS dashboard_id INTEGER REFERENCES dashboards(id) ON DELETE SET NULL;
+
+ALTER TABLE collaboration_notifications
+ALTER COLUMN notification_type TYPE VARCHAR(40);
+
+ALTER TABLE collaboration_notifications
 DROP CONSTRAINT IF EXISTS collaboration_notifications_collaboration_id_fkey;
 
 ALTER TABLE collaboration_notifications
