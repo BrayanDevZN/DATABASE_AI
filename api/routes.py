@@ -503,22 +503,28 @@ def create_data_source(
     except Exception as error:
         raise HTTPException(status_code=400, detail=str(error))
 
-    data_source = data_source_manager.ManagerDataSources().create_data_source(
-        user_id=user_id,
-        name=name,
-        file_name=file_name,
-        file_data=file_data,
-        row_count=row_count,
-        column_count=column_count,
-        source_type=source_type,
-        connection_config=build_connection_config(
+    try:
+        data_source = data_source_manager.ManagerDataSources().create_data_source(
+            user_id=user_id,
+            name=name,
+            file_name=file_name,
+            file_data=file_data,
+            row_count=row_count,
+            column_count=column_count,
             source_type=source_type,
-            api_url=api_url,
-            database_url=database_url,
-            query=query,
-        ),
-        refresh_interval_days=refresh_interval_days,
-    )
+            connection_config=build_connection_config(
+                source_type=source_type,
+                api_url=api_url,
+                database_url=database_url,
+                query=query,
+            ),
+            refresh_interval_days=refresh_interval_days,
+        )
+    except Exception as error:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Nao foi possivel salvar a fonte no banco de dados: {error}",
+        )
 
     return {"data_source": data_source}
 
@@ -639,17 +645,23 @@ def update_data_source(
     except Exception as error:
         raise HTTPException(status_code=400, detail=str(error))
 
-    data_source = data_source_manager.ManagerDataSources().update_data_source(
-        user_id=access["owner_user_id"],
-        data_source_id=data_source_id,
-        file_name=file_name,
-        file_data=file_data,
-        row_count=row_count,
-        column_count=column_count,
-        source_type=next_source_type,
-        connection_config=next_config,
-        refresh_interval_days=next_refresh_interval_days,
-    )
+    try:
+        data_source = data_source_manager.ManagerDataSources().update_data_source(
+            user_id=access["owner_user_id"],
+            data_source_id=data_source_id,
+            file_name=file_name,
+            file_data=file_data,
+            row_count=row_count,
+            column_count=column_count,
+            source_type=next_source_type,
+            connection_config=next_config,
+            refresh_interval_days=next_refresh_interval_days,
+        )
+    except Exception as error:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Nao foi possivel atualizar a fonte no banco de dados: {error}",
+        )
 
     if refresh_dashboards and linked_dashboards:
         charts_manager.ManagerCharts().mark_dashboards_outdated_by_data_source(
