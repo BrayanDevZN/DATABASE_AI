@@ -145,11 +145,11 @@ class RepositoryDataSources:
                         :column_count,
                         :source_type,
                         CAST(:connection_config AS JSONB),
-                        :refresh_interval_days,
+                        CAST(:refresh_interval_days AS INTEGER),
                         NOW(),
                         CASE
-                            WHEN :refresh_interval_days IS NULL THEN NULL
-                            ELSE NOW() + (:refresh_interval_days || ' days')::interval
+                            WHEN CAST(:refresh_interval_days AS INTEGER) IS NULL THEN NULL
+                            ELSE NOW() + (CAST(:refresh_interval_days AS INTEGER) || ' days')::interval
                         END
                     )
                     RETURNING
@@ -266,11 +266,11 @@ class RepositoryDataSources:
                         column_count = :column_count,
                         source_type = COALESCE(:source_type, source_type),
                         connection_config = COALESCE(CAST(:connection_config AS JSONB), connection_config),
-                        refresh_interval_days = :refresh_interval_days,
+                        refresh_interval_days = CAST(:refresh_interval_days AS INTEGER),
                         last_synced_at = NOW(),
                         next_sync_at = CASE
-                            WHEN :refresh_interval_days IS NULL THEN NULL
-                            ELSE NOW() + (:refresh_interval_days || ' days')::interval
+                            WHEN CAST(:refresh_interval_days AS INTEGER) IS NULL THEN NULL
+                            ELSE NOW() + (CAST(:refresh_interval_days AS INTEGER) || ' days')::interval
                         END,
                         updated_at = NOW()
                     WHERE id = :data_source_id
