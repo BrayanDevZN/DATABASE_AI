@@ -102,7 +102,7 @@ def read_uploaded_file(file: UploadFile) -> tuple[list[dict], int, int]:
 
 def normalize_rows(rows) -> tuple[list[dict], int, int]:
     if isinstance(rows, dict):
-        for key in ("data", "results", "items", "rows"):
+        for key in ("data", "results", "items", "rows", "products", "users"):
             if isinstance(rows.get(key), list):
                 rows = rows[key]
                 break

@@ -14,6 +14,7 @@ engine = main_database()
 class RepositoryDataSources:
     def __init__(self) -> None:
         self.db = engine
+        self.ensure_external_source_columns()
 
     def _make_json_safe(self, value):
         if isinstance(value, dict):
@@ -63,6 +64,49 @@ class RepositoryDataSources:
 
     def _row_to_dict(self, row) -> dict | None:
         return dict(row._mapping) if row else None
+
+    def ensure_external_source_columns(self) -> None:
+        with self.db.connect() as session:
+            session.execute(
+                text("""
+                    ALTER TABLE data_sources
+                    ADD COLUMN IF NOT EXISTS source_type VARCHAR(20) NOT NULL DEFAULT 'file',
+                    ADD COLUMN IF NOT EXISTS connection_config JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    ADD COLUMN IF NOT EXISTS refresh_interval_days INTEGER,
+                    ADD COLUMN IF NOT EXISTS last_synced_at TIMESTAMP,
+                    ADD COLUMN IF NOT EXISTS next_sync_at TIMESTAMP
+                """)
+            )
+            session.execute(
+                text("""
+                    UPDATE data_sources
+                    SET
+                        source_type = COALESCE(NULLIF(source_type, ''), 'file'),
+                        connection_config = COALESCE(connection_config, '{}'::jsonb),
+                        last_synced_at = COALESCE(last_synced_at, updated_at),
+                        next_sync_at = CASE
+                            WHEN refresh_interval_days IS NULL THEN next_sync_at
+                            ELSE COALESCE(next_sync_at, updated_at + (refresh_interval_days || ' days')::interval)
+                        END
+                """)
+            )
+            session.execute(
+                text("""
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1
+                            FROM pg_constraint
+                            WHERE conname = 'data_sources_source_type_check'
+                        ) THEN
+                            ALTER TABLE data_sources
+                            ADD CONSTRAINT data_sources_source_type_check
+                            CHECK (source_type IN ('file', 'web', 'database'));
+                        END IF;
+                    END $$
+                """)
+            )
+            session.commit()
 
     def create_data_source(
         self,
