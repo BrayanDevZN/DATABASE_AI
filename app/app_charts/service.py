@@ -171,6 +171,8 @@ class ServiceCharts:
                 "group_by": chart.get("group_by"),
                 "aggregation": chart.get("aggregation"),
                 "operation": chart.get("operation"),
+                "filters": chart.get("filters", []),
+                "drill_down": chart.get("drill_down", {"enabled": False}),
                 "reason": chart.get("reason", ""),
             }
 
