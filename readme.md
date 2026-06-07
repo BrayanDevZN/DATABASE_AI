@@ -1,545 +1,811 @@
-<div align="center">
+# DataPilot Accounts, Data Sources and Dashboards API
 
-# 👤 Accounts & Conversations API
+API principal de persistencia do DataPilot. Este servico concentra autenticacao, usuarios, conversas, fontes de dados, dashboards, graficos, colaboracoes e notificacoes. Ele tambem faz a ponte entre dados cadastrados pelo usuario e a API de IA responsavel por gerar analises.
 
-**API de autenticação, gerenciamento de usuários e histórico de conversas**
+## Visao geral
 
-[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Railway](https://img.shields.io/badge/Deploy-Railway-0B0D0E?style=for-the-badge&logo=railway&logoColor=white)](https://railway.app)
-[![JWT](https://img.shields.io/badge/Auth-JWT-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white)](https://jwt.io)
+O projeto `DATABASE` e o backend operacional da plataforma. Apesar do nome, ele nao e apenas banco de dados: e uma API FastAPI completa para gerenciar o estado do produto.
 
-</div>
+Principais responsabilidades:
 
----
+- cadastro, login e validacao de usuarios;
+- envio de codigos por e-mail para criacao e recuperacao de senha;
+- gerenciamento de perfil, username e foto;
+- persistencia de conversas e mensagens;
+- criacao e atualizacao de fontes de dados;
+- leitura de arquivos, APIs externas e bancos SQL;
+- criacao, listagem, atualizacao e exclusao de dashboards;
+- salvamento de graficos e configuracoes visuais;
+- compartilhamento de dashboards com permissoes;
+- notificacoes sobre convites e atualizacoes;
+- sincronizacao automatica de fontes com dashboards vinculados.
 
-## 📋 Índice
+## Tecnologias
 
-- [Sobre](#-sobre)
-- [URL Base](#-url-base)
-- [Autenticação](#-autenticação)
-- [Rotas — Usuários](#-rotas--usuários)
-- [Rotas — Conversas](#-rotas--conversas)
-- [Fluxos completos](#-fluxos-completos)
-- [Códigos de resposta](#-códigos-de-resposta)
+| Tecnologia | Uso no projeto |
+| --- | --- |
+| Python | Linguagem principal |
+| FastAPI | Framework HTTP da API |
+| Uvicorn | Servidor ASGI |
+| Pydantic | Validacao dos modelos de entrada |
+| SQLAlchemy | Execucao de consultas SQL externas e suporte de persistencia |
+| PostgreSQL / psycopg | Banco relacional em producao |
+| pandas | Leitura e normalizacao de CSV, Excel, JSON e dados externos |
+| python-jose | Criacao e leitura de JWT |
+| passlib / bcrypt | Hash e verificacao de senhas |
+| requests | Chamada para a API de IA e APIs externas |
+| resend | Envio de e-mails transacionais |
+| python-multipart | Upload de arquivos via FormData |
+| Railway | Deploy da API |
 
----
+## Arquitetura
 
-## 📖 Sobre
-
-API responsável por toda a camada de **identidade e histórico** da plataforma. Ela oferece:
-
-- Cadastro de usuários com validação de e-mail por código
-- Login com retorno de JWT
-- Recuperação e atualização de senha
-- Validação de tokens JWT
-- Criação e consulta de conversas e mensagens
-
----
-
-## 🌐 URL Base
-
-```
-https://web-production-81b91.up.railway.app
-```
-
-Todos os endpoints abaixo são relativos a essa URL.
-
----
-
-## 🔐 Autenticação
-
-A API utiliza **JWT (JSON Web Token)**. O token é retornado no login e deve ser incluído no body das rotas que exigem autenticação, no campo `token`.
-
-> Não há header `Authorization` — o token vai **sempre no body** da requisição.
-
----
-
-## 👤 Rotas — Usuários
-
-### 1. Enviar código de verificação
-
-Envia um código por e-mail para validar o endereço antes do cadastro.
-
-```
-POST /env_code_create
+```text
+Cliente / Frontend
+      |
+      v
+api/routes.py
+      |
+      +--> auth/
+      |     +--> jwt.py
+      |     +--> hash.py
+      |     +--> auth_sender.py
+      |
+      +--> app/app_accounts/
+      +--> app/app_conversations/
+      +--> app/app_data_sources/
+      +--> app/app_charts/
+      +--> app/app_collaborations/
+      |
+      +--> connect/
+            +--> database.py
+            +--> manager_database.py
 ```
 
-**Body:**
+### Padrao interno
+
+O projeto segue uma separacao simples por dominio:
+
+| Camada | Responsabilidade |
+| --- | --- |
+| `api/routes.py` | Define endpoints, CORS, leitura de arquivos e orquestracoes de alto nivel |
+| `api/model/` | Contratos Pydantic por dominio |
+| `auth/` | JWT, hash de senha e envio de codigos |
+| `connect/` | Conexao e comandos de banco |
+| `app/app_accounts/` | Regras de usuario, login, perfil e senha |
+| `app/app_conversations/` | Conversas e mensagens |
+| `app/app_data_sources/` | Fontes de dados |
+| `app/app_charts/` | Dashboards, graficos e configuracoes |
+| `app/app_collaborations/` | Compartilhamentos, convites e notificacoes |
+
+## Estrutura de pastas
+
+```text
+DATABASE/
+├── api/
+│   ├── routes.py
+│   └── model/
+│       ├── model_accounts.py
+│       ├── model_charts.py
+│       ├── model_collaboration.py
+│       ├── model_conversation.py
+│       └── model_data_source.py
+├── app/
+│   ├── app_accounts/
+│   ├── app_charts/
+│   ├── app_collaborations/
+│   ├── app_conversations/
+│   └── app_data_sources/
+├── auth/
+├── connect/
+├── core/
+├── Procfile
+├── requirements.txt
+└── readme.md
+```
+
+## Variaveis de ambiente
+
+As variaveis podem ser configuradas no ambiente local ou no provedor de deploy.
+
+| Variavel | Obrigatoria | Descricao |
+| --- | --- | --- |
+| `DATABASE_URL` | Sim | URL de conexao com o banco principal da plataforma |
+| `AI_URL` | Nao | URL da API de IA. Padrao: `https://web-production-40ead.up.railway.app` |
+| `SECRET_KEY` ou equivalente JWT | Sim | Segredo usado para assinar tokens |
+| `RESEND_API_KEY` | Sim para e-mail | Chave para envio de codigos por e-mail |
+| `EMAIL_FROM` | Sim para e-mail | Remetente usado nos envios |
+| `PORT` | Deploy | Porta definida pelo Railway/ambiente |
+
+Consulte os arquivos em `auth/`, `connect/` e `core/` para nomes finais usados na sua configuracao atual.
+
+## Como executar localmente
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn api.routes:app --reload --host 0.0.0.0 --port 8000
+```
+
+No Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn api.routes:app --reload --host 0.0.0.0 --port 8000
+```
+
+O `Procfile` de producao usa:
+
+```text
+web: uvicorn api.routes:app --host 0.0.0.0 --port $PORT
+```
+
+## Autenticacao
+
+A autenticacao usa JWT. Na maior parte das rotas, o token e enviado no body JSON ou no `FormData` com o campo `token`.
+
+Exemplo:
+
+```json
+{
+  "token": "JWT_DO_USUARIO"
+}
+```
+
+O helper `get_user_id_from_token` extrai o `user_id` do token. Quando o token e invalido, a API retorna erro de permissao ou mensagem de token invalido.
+
+## Rotas de usuarios e autenticacao
+
+### `POST /env_code_create`
+
+Envia codigo de verificacao para criacao de conta.
+
+Body:
+
 ```json
 {
   "email": "usuario@email.com"
 }
 ```
 
-**Resposta:** `201 Created`
-```json
-"usuario@email.com"
-```
+### `POST /valid_user`
 
----
+Verifica se um e-mail ja existe.
 
-### 2. Verificar se e-mail já existe
+Body:
 
-Checa se um e-mail já está cadastrado na base.
-
-```
-POST /valid_user
-```
-
-**Body:**
 ```json
 {
   "email": "usuario@email.com"
 }
 ```
 
-**Resposta:** `200 OK`
+### `POST /valid_username`
+
+Verifica disponibilidade de username.
+
+Body:
+
 ```json
-{ "exists": true }
-// ou
-{ "exists": false }
+{
+  "username": "usuario123"
+}
 ```
 
----
+### `POST /create_user`
 
-### 3. Criar usuário
+Cria uma conta e retorna dados de autenticacao.
 
-Cadastra um novo usuário. Requer o código de verificação enviado por e-mail.
+Body:
 
-```
-POST /create_user
-```
-
-**Body:**
 ```json
 {
   "email": "usuario@email.com",
-  "password": "senha123",
-  "name": "João Silva",
-  "age": 28,
+  "password": "senha_segura",
+  "name": "Nome do Usuario",
+  "username": "usuario123",
+  "age": 25,
   "gender": "masculino",
   "code": 123456
 }
 ```
 
-| Campo | Tipo | Descrição |
-|---|---|---|
-| `email` | string | E-mail do usuário |
-| `password` | string | Senha |
-| `name` | string | Nome completo |
-| `age` | int | Idade |
-| `gender` | string | Gênero |
-| `code` | int | Código recebido por e-mail |
+### `POST /login`
 
-**Resposta:** `201 Created` — mesmo formato do login (com token JWT) ou `null` se o código for inválido/expirado.
+Autentica o usuario.
 
-```json
-{
-  "exists": true,
-  "status": true,
-  "token": "eyJ...",
-  "name": "João Silva",
-  "gender": "masculino",
-  "age": 28
-}
-```
+Body:
 
----
-
-### 4. Login
-
-Autentica o usuário e retorna um JWT.
-
-```
-POST /login
-```
-
-**Body:**
 ```json
 {
   "email": "usuario@email.com",
-  "password": "senha123"
+  "password": "senha_segura"
 }
 ```
 
-**Resposta:** `200 OK`
+### `POST /valid_token`
 
-| Cenário | `exists` | `status` | `token` |
-|---|---|---|---|
-| Usuário não encontrado | `false` | `false` | `null` |
-| Senha incorreta | `true` | `false` | `null` |
-| Login bem-sucedido | `true` | `true` | `"eyJ..."` |
+Valida um JWT.
+
+Body:
 
 ```json
 {
-  "exists": true,
-  "status": true,
-  "token": "eyJ...",
-  "name": "João Silva",
-  "gender": "masculino",
-  "age": 28
+  "token": "JWT_DO_USUARIO"
 }
 ```
 
----
+### `POST /me`
 
-### 5. Validar token JWT
+Retorna dados do usuario autenticado.
 
-Verifica se um token ainda é válido e se o usuário é administrador.
+Body:
 
-```
-POST /valid_token
-```
-
-**Body:**
 ```json
 {
-  "token": "eyJ..."
+  "token": "JWT_DO_USUARIO"
 }
 ```
 
-**Resposta:** `200 OK`
+### `POST /check_pass`
+
+Valida a senha atual antes de altera-la.
+
+Body:
+
 ```json
 {
-  "admin": false,
-  "is_valid": true,
-  "token": "eyJ..."
-}
-```
-
----
-
-### 6. Verificar senha atual
-
-Valida a senha atual do usuário. Retorna um `change_token` temporário para autorizar a troca de senha.
-
-```
-POST /check_pass
-```
-
-**Body:**
-```json
-{
-  "token": "eyJ...",
-  "password": "senha_atual"
-}
-```
-
-**Resposta:** `200 OK`
-```json
-{
-  "status": true,
-  "change_token": "eyJ..."
-}
-// ou
-{ "status": false }
-```
-
----
-
-### 7. Atualizar senha (fluxo autenticado)
-
-Troca a senha usando o `change_token` retornado por `/check_pass`.
-
-```
-PATCH /update_pass
-```
-
-**Body:**
-```json
-{
-  "token": "change_token_aqui",
+  "token": "JWT_DO_USUARIO",
+  "current_password": "senha_atual",
   "password": "nova_senha"
 }
 ```
 
-**Resposta:** `200 OK`
-```json
-{ "status": true }
-// ou
-{ "status": false }
-```
+### `PATCH /update_pass`
 
----
+Atualiza a senha em fluxo autenticado.
 
-### 8. Enviar código para recuperação de senha
+Body:
 
-Envia um código por e-mail para redefinição de senha (usuário esqueceu a senha). Requer token JWT válido.
-
-```
-POST /env_pass
-```
-
-**Body:**
 ```json
 {
-  "token": "eyJ..."
+  "token": "JWT_DO_USUARIO",
+  "current_password": "senha_atual",
+  "password": "nova_senha"
 }
 ```
 
-**Resposta:** `200 OK`
-```json
-true
-// ou
-false
-```
+### `POST /env_pass`
 
----
+Envia codigo para recuperacao de senha. Pode receber `email` ou `token`, dependendo do fluxo.
 
-### 9. Redefinir senha com código (recuperação)
+Body:
 
-Redefine a senha usando o código recebido por e-mail. Não aceita a mesma senha atual.
-
-```
-PATCH /update_auth_pass
-```
-
-**Body:**
 ```json
 {
-  "token": "eyJ...",
+  "email": "usuario@email.com"
+}
+```
+
+ou:
+
+```json
+{
+  "token": "JWT_DO_USUARIO"
+}
+```
+
+### `PATCH /update_auth_pass`
+
+Redefine senha com codigo.
+
+Body:
+
+```json
+{
+  "email": "usuario@email.com",
   "code": 123456,
   "password": "nova_senha"
 }
 ```
 
-**Resposta:** `200 OK`
+ou:
 
-| Cenário | `status` |
-|---|---|
-| Sucesso | `true` |
-| Token/código inválido ou expirado | `false` |
-| Nova senha igual à atual | `"equal"` |
-
----
-
-### 10. Atualizar nome
-
-Atualiza o nome do usuário autenticado.
-
-```
-PATCH /update_name
-```
-
-**Body:**
 ```json
 {
-  "token": "eyJ...",
+  "token": "JWT_DO_USUARIO",
+  "code": 123456,
+  "password": "nova_senha"
+}
+```
+
+### `PATCH /update_name`
+
+Atualiza nome do usuario.
+
+```json
+{
+  "token": "JWT_DO_USUARIO",
   "name": "Novo Nome"
 }
 ```
 
-**Resposta:** `200 OK`
-```json
-{ "status": true }
-// ou
-{ "status": false }
-```
+### `PATCH /update_username`
 
----
+Atualiza username.
 
-## 💬 Rotas — Conversas
-
-### 11. Criar mensagem em uma conversa
-
-Salva uma mensagem (do usuário ou do assistente) em uma conversa.
-
-```
-POST /conversation
-```
-
-**Body:**
 ```json
 {
-  "token": "eyJ...",
+  "token": "JWT_DO_USUARIO",
+  "username": "novo_username"
+}
+```
+
+### `PATCH /update_profile_image`
+
+Atualiza imagem de perfil.
+
+```json
+{
+  "token": "JWT_DO_USUARIO",
+  "profile_image": "base64_ou_url"
+}
+```
+
+### `DELETE /delete_user`
+
+Remove a conta do usuario e dados relacionados.
+
+```json
+{
+  "token": "JWT_DO_USUARIO",
+  "password": "senha_atual"
+}
+```
+
+## Rotas de conversas
+
+### `POST /conversation/create`
+
+Cria uma conversa vazia.
+
+```json
+{
+  "token": "JWT_DO_USUARIO",
+  "title": "Analise de vendas"
+}
+```
+
+### `POST /conversation`
+
+Salva uma mensagem.
+
+```json
+{
+  "token": "JWT_DO_USUARIO",
   "conversation_id": 1,
   "role": "user",
-  "content": "Qual produto vende mais?"
+  "content": "Analise meus dados"
 }
 ```
 
-| Campo | Tipo | Descrição |
-|---|---|---|
-| `token` | string | JWT do usuário |
-| `conversation_id` | int | ID da conversa (deve ser `> 0`) |
-| `role` | string | `"user"` ou `"assistant"` |
-| `content` | string | Conteúdo da mensagem (não pode ser vazio) |
+`role` aceita `user` ou `assistant`.
 
-**Resposta:** `201 Created`
+### `POST /conversations`
 
----
+Lista conversas do usuario.
 
-### 12. Listar todas as conversas do usuário
-
-Retorna um resumo de todas as conversas do usuário autenticado.
-
-```
-POST /conversations
-```
-
-**Body:**
 ```json
 {
-  "token": "eyJ..."
+  "token": "JWT_DO_USUARIO"
 }
 ```
 
-**Resposta:** `200 OK`
+### `POST /conversation/messages`
+
+Lista mensagens de uma conversa.
+
 ```json
 {
-  "conversations": [
-    {
-      "conversation_id": 1,
-      "created_at": "2024-01-15T10:30:00",
-      "updated_at": "2024-01-15T11:00:00",
-      "total_messages": 8
-    }
-  ]
-}
-```
-
----
-
-### 13. Buscar mensagens de uma conversa
-
-Retorna todas as mensagens de uma conversa específica.
-
-```
-POST /conversation/messages
-```
-
-**Body:**
-```json
-{
-  "token": "eyJ...",
+  "token": "JWT_DO_USUARIO",
   "conversation_id": 1
 }
 ```
 
-**Resposta:** `200 OK`
+### `POST /conversation/user`
+
+Lista conversas agrupadas por usuario autenticado.
+
 ```json
 {
-  "messages": [
-    {
-      "id": 42,
-      "user_id": 7,
-      "conversation_id": 1,
-      "role": "user",
-      "content": "Qual produto vende mais?",
-      "created_at": "2024-01-15T10:30:00"
-    },
-    {
-      "id": 43,
-      "user_id": 7,
-      "conversation_id": 1,
-      "role": "assistant",
-      "content": "O produto Teclado lidera as vendas...",
-      "created_at": "2024-01-15T10:30:05"
-    }
-  ]
+  "token": "JWT_DO_USUARIO"
 }
 ```
 
----
+### `DELETE /conversation`
 
-### 14. Buscar conversas por usuário
+Remove uma conversa.
 
-Retorna dados agrupados por usuário autenticado.
-
-```
-POST /conversation/user
-```
-
-**Body:**
 ```json
 {
-  "token": "eyJ..."
-}
-```
-
-**Resposta:** `200 OK` — lista de conversas do usuário.
-
----
-
-### 15. Deletar uma conversa
-
-Remove uma conversa e todas as suas mensagens.
-
-```
-DELETE /conversation
-```
-
-**Body:**
-```json
-{
-  "token": "eyJ...",
+  "token": "JWT_DO_USUARIO",
   "conversation_id": 1
 }
 ```
 
-**Resposta:** `200 OK`
+## Rotas de fontes de dados
+
+As fontes podem ser de tres tipos:
+
+| Tipo | Campo `source_type` | Entrada |
+| --- | --- | --- |
+| Arquivo | `file` | CSV, XLS, XLSX ou JSON |
+| API externa | `web` | `api_url` ou `api_payload` |
+| Banco SQL | `database` | `database_url` + query `SELECT` |
+
+### `POST /data-source/create`
+
+Cria uma fonte de dados.
+
+Content-Type: `multipart/form-data`
+
+Campos:
+
+| Campo | Obrigatorio | Descricao |
+| --- | --- | --- |
+| `token` | Sim | JWT do usuario |
+| `name` | Sim | Nome da fonte |
+| `source_type` | Nao | `file`, `web` ou `database`. Padrao: `file` |
+| `file` | Para `file` | Arquivo CSV/XLS/XLSX/JSON |
+| `api_url` | Para `web` | URL de API externa |
+| `api_payload` | Opcional | JSON ja carregado pelo frontend |
+| `database_url` | Para `database` | String de conexao |
+| `query` | Para `database` | Consulta SQL somente `SELECT` |
+| `refresh_interval_days` | Nao | Intervalo de sincronizacao automatica |
+
+### `POST /data-sources`
+
+Lista fontes do usuario, fontes compartilhadas e sincroniza fontes vencidas.
+
 ```json
-true
-// ou
-false
+{
+  "token": "JWT_DO_USUARIO"
+}
 ```
 
----
+### `POST /data-source`
 
-## 🔄 Fluxos completos
+Retorna uma fonte especifica.
 
-### Fluxo de cadastro
-
-```
-1. POST /env_code_create     → envia código para o e-mail
-2. POST /create_user         → cria conta com o código recebido
-                             → retorna JWT automaticamente
-```
-
-### Fluxo de login
-
-```
-1. POST /login               → retorna JWT se credenciais válidas
+```json
+{
+  "token": "JWT_DO_USUARIO",
+  "data_source_id": 1
+}
 ```
 
-### Fluxo de troca de senha (usuário logado)
+### `POST /data-source/linked-dashboards`
 
-```
-1. POST /check_pass          → valida senha atual → retorna change_token
-2. PATCH /update_pass        → usa change_token para salvar nova senha
-```
+Lista dashboards vinculados a uma fonte.
 
-### Fluxo de recuperação de senha (esqueci a senha)
-
-```
-1. POST /env_pass            → envia código para o e-mail (requer JWT válido)
-2. PATCH /update_auth_pass   → usa código + JWT para definir nova senha
+```json
+{
+  "token": "JWT_DO_USUARIO",
+  "data_source_id": 1
+}
 ```
 
-### Fluxo de conversa
+### `PATCH /data-source/update`
 
+Atualiza dados de uma fonte. Tambem pode marcar dashboards vinculados como desatualizados.
+
+Content-Type: `multipart/form-data`
+
+Campos principais:
+
+- `token`
+- `data_source_id`
+- `refresh_dashboards`
+- `source_type`
+- `file`
+- `api_url`
+- `api_payload`
+- `database_url`
+- `query`
+- `refresh_interval_days`
+
+### `PATCH /data-source/rename`
+
+Renomeia uma fonte.
+
+```json
+{
+  "token": "JWT_DO_USUARIO",
+  "data_source_id": 1,
+  "name": "Novo nome"
+}
 ```
-1. POST /conversation        → salva mensagem do usuário (role: "user")
-2. [IA processa a resposta]
-3. POST /conversation        → salva resposta da IA (role: "assistant")
-4. POST /conversation/messages → recupera histórico completo
+
+### `DELETE /data-source`
+
+Remove uma fonte.
+
+```json
+{
+  "token": "JWT_DO_USUARIO",
+  "data_source_id": 1
+}
 ```
 
----
+## Rotas de dashboards e graficos
 
-## 📊 Códigos de resposta
+### `POST /dashboards`
 
-| Código | Significado |
-|---|---|
-| `200 OK` | Requisição bem-sucedida |
-| `201 Created` | Recurso criado com sucesso |
-| `422 Unprocessable Entity` | Body inválido ou campos faltando |
+Lista dashboards do usuario, dashboards compartilhados e convites.
 
----
+```json
+{
+  "token": "JWT_DO_USUARIO"
+}
+```
 
-<div align="center">
+### `POST /dashboard`
 
-Feito com ☕ e **FastAPI** · [Voltar ao topo](#-accounts--conversations-api)
+Busca um dashboard com seus graficos.
 
-</div>
+```json
+{
+  "token": "JWT_DO_USUARIO",
+  "dashboard_id": 1
+}
+```
+
+### `POST /dashboard/create`
+
+Cria um dashboard persistido. Normalmente e chamado pela API de IA apos gerar analise.
+
+```json
+{
+  "token": "JWT_DO_USUARIO",
+  "title": "Dashboard Comercial",
+  "prompt": "Analise vendas mensais",
+  "ai_suggestion": "Resumo gerado pela IA",
+  "file_name": "vendas.xlsx",
+  "data_source_id": 1
+}
+```
+
+### `POST /dashboard/chart/create`
+
+Cria um grafico dentro de um dashboard.
+
+```json
+{
+  "dashboard_id": 1,
+  "chart_type": "bar",
+  "title": "Receita por categoria",
+  "chart_data": {
+    "data": []
+  },
+  "chart_config": {}
+}
+```
+
+### `POST /dashboard/refresh/finish`
+
+Salva resultado de uma atualizacao gerada pela IA.
+
+```json
+{
+  "token": "JWT_DO_USUARIO",
+  "dashboard_id": 1,
+  "prompt": "Novo prompt",
+  "ai_suggestion": "Nova analise",
+  "charts": []
+}
+```
+
+### `POST /dashboard/chart/settings`
+
+Salva configuracoes visuais de dashboard ou grafico.
+
+```json
+{
+  "token": "JWT_DO_USUARIO",
+  "dashboard_id": 1,
+  "chart_id": 10,
+  "chart_color": "#4f46e5",
+  "chart_background": "#f8fafc",
+  "x_axis_text_color": "#0f172a",
+  "y_axis_text_color": "#0f172a",
+  "grid_color": "#cbd5e1",
+  "grid_style": "3 3",
+  "bar_style": "rounded",
+  "show_legend": true,
+  "pie_colors": ["#4f46e5", "#06b6d4"]
+}
+```
+
+### `DELETE /dashboard`
+
+Remove dashboard.
+
+```json
+{
+  "token": "JWT_DO_USUARIO",
+  "dashboard_id": 1
+}
+```
+
+## Rotas de colaboracao
+
+Permissoes aceitas:
+
+| Permissao | Significado |
+| --- | --- |
+| `read` | Apenas visualizar |
+| `edit` | Editar configuracoes e conteudo permitido |
+| `full` | Acesso amplo, incluindo atualizacoes vinculadas |
+
+### `POST /users/search`
+
+Busca usuarios por username/nome para compartilhar.
+
+```json
+{
+  "token": "JWT_DO_USUARIO",
+  "query": "ana"
+}
+```
+
+### `POST /collaborations`
+
+Retorna visao geral de dashboards, compartilhados e convites.
+
+```json
+{
+  "token": "JWT_DO_USUARIO"
+}
+```
+
+### `POST /dashboard/collaborations`
+
+Lista colaboradores de um dashboard.
+
+```json
+{
+  "token": "JWT_DO_USUARIO",
+  "dashboard_id": 1
+}
+```
+
+### `POST /dashboard/collaboration/share`
+
+Compartilha dashboard com outro usuario.
+
+```json
+{
+  "token": "JWT_DO_USUARIO",
+  "dashboard_id": 1,
+  "username": "colega",
+  "permission": "edit"
+}
+```
+
+### `PATCH /dashboard/collaboration`
+
+Atualiza permissao de colaborador.
+
+```json
+{
+  "token": "JWT_DO_USUARIO",
+  "collaboration_id": 1,
+  "permission": "full"
+}
+```
+
+### `DELETE /dashboard/collaboration`
+
+Remove colaboracao.
+
+```json
+{
+  "token": "JWT_DO_USUARIO",
+  "collaboration_id": 1
+}
+```
+
+### `POST /dashboard/collaboration/respond`
+
+Aceita ou recusa convite.
+
+```json
+{
+  "token": "JWT_DO_USUARIO",
+  "collaboration_id": 1,
+  "response": "accepted"
+}
+```
+
+`response` aceita `accepted` ou `declined`.
+
+### `POST /dashboard/access`
+
+Lista pessoas com acesso ao dashboard.
+
+```json
+{
+  "token": "JWT_DO_USUARIO",
+  "dashboard_id": 1
+}
+```
+
+## Rotas de notificacoes
+
+### `POST /notifications`
+
+Lista notificacoes do usuario.
+
+```json
+{
+  "token": "JWT_DO_USUARIO"
+}
+```
+
+### `PATCH /notification/read`
+
+Marca notificacao como lida.
+
+```json
+{
+  "token": "JWT_DO_USUARIO",
+  "notification_id": 1
+}
+```
+
+## Fontes de dados e sincronizacao automatica
+
+Quando `/data-sources` e chamado, a API verifica fontes com `refresh_interval_days` vencido. Para cada fonte vencida:
+
+1. recarrega os dados pela configuracao original;
+2. atualiza a fonte no banco;
+3. busca dashboards vinculados;
+4. chama a API de IA para recalcular dashboards;
+5. salva os dashboards atualizados quando possivel;
+6. cria notificacoes em caso de sucesso ou falha.
+
+## Integracao com a API de IA
+
+A variavel `AI_URL` define para onde a API envia pedidos de reanalise. O fluxo de refresh usa:
+
+```text
+DATABASE /data-sources
+  -> detecta fonte vencida
+  -> POST {AI_URL}/dashboard/refresh/analyze
+  -> salva resultado via ManagerCharts
+```
+
+## Codigos de resposta
+
+| Codigo | Uso |
+| --- | --- |
+| `200 OK` | Consulta, atualizacao ou exclusao bem-sucedida |
+| `201 Created` | Criacao de usuario, conversa, fonte, dashboard, grafico ou colaboracao |
+| `400 Bad Request` | Erro de validacao de regra de negocio |
+| `422 Unprocessable Entity` | Body/FormData fora do schema esperado |
+| `500 Internal Server Error` | Erro inesperado |
+
+## Observacoes de seguranca
+
+- Para fontes `database`, apenas consultas iniciadas com `SELECT` sao aceitas.
+- Tokens sao resolvidos no backend para impedir acesso a dados de outro usuario.
+- Colaboracoes passam por verificacao de permissao antes de listar fontes e dashboards.
+- Senhas devem ser armazenadas apenas com hash.
+- Strings de conexao de banco externo devem ser tratadas como segredo.
+
+## Status da pasta de migrations
+
+A pasta `migrations/` foi removida deste reposititorio conforme decisao do projeto. Caso o time volte a usar versionamento formal de schema, recomenda-se recriar uma estrutura controlada com Alembic ou ferramenta equivalente.
