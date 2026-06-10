@@ -20,6 +20,7 @@ import app.app_accounts.manager_accounts as manager
 import app.app_conversations.manager_conversation as conversation_manager
 import app.app_charts.manager_charts as charts_manager
 import app.app_data_sources.manager_data_sources as data_source_manager
+from app.app_accounts.repository import RepositoryAccount
 from app.app_collaborations.manager_collaborations import ManagerCollaborations
 
 from auth.jwt import JWT
@@ -27,6 +28,7 @@ from auth.jwt import JWT
 
 app = FastAPI()
 collaborations = ManagerCollaborations()
+accounts_repository = RepositoryAccount()
 AI_URL = os.getenv("AI_URL", "https://web-production-40ead.up.railway.app")
 
 app.add_middleware(
@@ -69,10 +71,34 @@ def make_json_safe(value):
 def get_user_id_from_token(token: str) -> int:
     user_id = JWT().get_jwt(key="user_id", token=token)
 
-    if user_id is None:
-        raise ValueError("Token inválido.")
+    try:
+        user_id = int(user_id)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=401,
+            detail="Sessao expirada. Faca login novamente.",
+        )
+
+    if not accounts_repository.select(user_id):
+        raise HTTPException(
+            status_code=401,
+            detail="Sessao expirada. Faca login novamente.",
+        )
 
     return user_id
+
+
+def format_data_source_database_error(error: Exception) -> str:
+    message = str(error)
+
+    if (
+        "ForeignKeyViolation" in message
+        or "data_sources_user_id_fkey" in message
+        or 'is not present in table "users"' in message
+    ):
+        return "Sessao expirada. Faca login novamente."
+
+    return "Nao foi possivel salvar a fonte no banco de dados."
 
 
 def read_uploaded_file(file: UploadFile) -> tuple[list[dict], int, int]:
@@ -500,6 +526,8 @@ def create_data_source(
             database_url=database_url,
             query=query,
         )
+    except HTTPException:
+        raise
     except Exception as error:
         raise HTTPException(status_code=400, detail=str(error))
 
@@ -520,10 +548,12 @@ def create_data_source(
             ),
             refresh_interval_days=refresh_interval_days,
         )
+    except HTTPException:
+        raise
     except Exception as error:
         raise HTTPException(
             status_code=400,
-            detail=f"Nao foi possivel salvar a fonte no banco de dados: {error}",
+            detail=format_data_source_database_error(error),
         )
 
     return {"data_source": data_source}
@@ -642,6 +672,8 @@ def update_data_source(
             database_url=next_config.get("database_url"),
             query=next_config.get("query"),
         )
+    except HTTPException:
+        raise
     except Exception as error:
         raise HTTPException(status_code=400, detail=str(error))
 
@@ -657,10 +689,12 @@ def update_data_source(
             connection_config=next_config,
             refresh_interval_days=next_refresh_interval_days,
         )
+    except HTTPException:
+        raise
     except Exception as error:
         raise HTTPException(
             status_code=400,
-            detail=f"Nao foi possivel atualizar a fonte no banco de dados: {error}",
+            detail=format_data_source_database_error(error),
         )
 
     if refresh_dashboards and linked_dashboards:
