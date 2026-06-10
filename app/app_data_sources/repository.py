@@ -1,8 +1,10 @@
+from datetime import date, datetime
 import json
+import math
 
+import pandas as pd
 from sqlalchemy import text
 
-from app.dataframe_io import make_json_safe
 from connect.manager_database import main_database
 
 
@@ -14,9 +16,48 @@ class RepositoryDataSources:
         self.db = engine
         self.ensure_external_source_columns()
 
+    def _make_json_safe(self, value):
+        if isinstance(value, dict):
+            return {
+                str(key): self._make_json_safe(item)
+                for key, item in value.items()
+            }
+
+        if isinstance(value, list):
+            return [
+                self._make_json_safe(item)
+                for item in value
+            ]
+
+        if isinstance(value, tuple):
+            return [
+                self._make_json_safe(item)
+                for item in value
+            ]
+
+        if isinstance(value, pd.Timestamp):
+            return value.isoformat()
+
+        if isinstance(value, (datetime, date)):
+            return value.isoformat()
+
+        if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+            return None
+
+        if pd.isna(value) if not isinstance(value, (list, dict, tuple, str)) else False:
+            return None
+
+        if hasattr(value, "item"):
+            try:
+                return value.item()
+            except Exception:
+                return value
+
+        return value
+
     def _json_dumps(self, value) -> str:
         return json.dumps(
-            make_json_safe(value),
+            self._make_json_safe(value),
             ensure_ascii=False,
             default=str
         )

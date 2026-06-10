@@ -1,9 +1,12 @@
+import io
 import json
 import os
+from datetime import date, datetime
 
+import pandas as pd
 import requests
 
-from fastapi import BackgroundTasks, Body, FastAPI, File, Form, HTTPException, UploadFile, status
+from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, text
 
@@ -17,18 +20,13 @@ import app.app_accounts.manager_accounts as manager
 import app.app_conversations.manager_conversation as conversation_manager
 import app.app_charts.manager_charts as charts_manager
 import app.app_data_sources.manager_data_sources as data_source_manager
-from app.app_accounts.repository import RepositoryAccount
 from app.app_collaborations.manager_collaborations import ManagerCollaborations
-from app.app_data_sources.tasks import refresh_linked_dashboards_task
-from app.dataframe_io import make_json_safe, read_uploaded_content, rows_to_records
-from core.celery_app import celery_broker_configured
 
 from auth.jwt import JWT
 
 
 app = FastAPI()
 collaborations = ManagerCollaborations()
-accounts_repository = RepositoryAccount()
 AI_URL = os.getenv("AI_URL", "https://web-production-40ead.up.railway.app")
 
 app.add_middleware(
@@ -40,27 +38,95 @@ app.add_middleware(
 )
 
 
+def make_json_safe(value):
+    if isinstance(value, dict):
+        return {str(key): make_json_safe(item) for key, item in value.items()}
+
+    if isinstance(value, list):
+        return [make_json_safe(item) for item in value]
+
+    if isinstance(value, tuple):
+        return [make_json_safe(item) for item in value]
+
+    if isinstance(value, pd.Timestamp):
+        return value.isoformat()
+
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+
+    if pd.isna(value) if not isinstance(value, (list, dict, tuple, str)) else False:
+        return None
+
+    if hasattr(value, "item"):
+        try:
+            return value.item()
+        except Exception:
+            return value
+
+    return value
+
 
 def get_user_id_from_token(token: str) -> int:
     user_id = JWT().get_jwt(key="user_id", token=token)
 
-    try:
-        user_id = int(user_id)
-    except (TypeError, ValueError):
-        raise ValueError("Sessao invalida. Faca login novamente.")
-
-    if not accounts_repository.select(user_id):
-        raise ValueError("Sessao expirada ou usuario inexistente. Faca login novamente.")
+    if user_id is None:
+        raise ValueError("Token inválido.")
 
     return user_id
 
 
 def read_uploaded_file(file: UploadFile) -> tuple[list[dict], int, int]:
-    return read_uploaded_content(file.file.read(), file.filename)
+    content = file.file.read()
+    filename = file.filename.lower()
+
+    if filename.endswith(".csv"):
+        df = pd.read_csv(io.BytesIO(content))
+    elif filename.endswith(".xlsx") or filename.endswith(".xls"):
+        df = pd.read_excel(io.BytesIO(content))
+    elif filename.endswith(".json"):
+        df = pd.read_json(io.BytesIO(content))
+    else:
+        raise ValueError("Formato inválido. Envie CSV, XLSX, XLS ou JSON.")
+
+    df = df.dropna(how="all")
+    df = df.where(pd.notnull(df), None)
+
+    for column in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[column]):
+            df[column] = df[column].astype(str)
+
+    file_data = make_json_safe(df.to_dict(orient="records"))
+    row_count = len(df)
+    column_count = len(df.columns)
+
+    return file_data, row_count, column_count
 
 
 def normalize_rows(rows) -> tuple[list[dict], int, int]:
-    return rows_to_records(rows)
+    if isinstance(rows, dict):
+        for key in ("data", "results", "items", "rows", "products", "users"):
+            if isinstance(rows.get(key), list):
+                rows = rows[key]
+                break
+        else:
+            rows = [rows]
+
+    if not isinstance(rows, list):
+        raise ValueError("A fonte precisa retornar uma lista de registros.")
+
+    df = pd.DataFrame(rows)
+    df = df.dropna(how="all")
+    df = df.where(pd.notnull(df), None)
+
+    for column in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[column]):
+            df[column] = df[column].astype(str)
+
+    file_data = make_json_safe(df.to_dict(orient="records"))
+    row_count = len(df)
+    column_count = len(df.columns)
+
+    return file_data, row_count, column_count
 
 
 def read_web_source(url: str) -> tuple[list[dict], int, int]:
@@ -251,52 +317,7 @@ def refresh_linked_dashboards_after_source_sync(
     return refreshed_dashboards
 
 
-def enqueue_linked_dashboard_refresh(
-    token: str,
-    user_id: int,
-    source: dict,
-    dashboards: list[dict],
-    background_tasks: BackgroundTasks | None = None,
-) -> bool:
-    if not dashboards:
-        return False
-
-    safe_source = make_json_safe(source)
-    safe_dashboards = make_json_safe(dashboards)
-
-    if celery_broker_configured():
-        refresh_linked_dashboards_task.delay(
-            token,
-            user_id,
-            safe_source,
-            safe_dashboards,
-        )
-        return True
-
-    if background_tasks:
-        background_tasks.add_task(
-            refresh_linked_dashboards_after_source_sync,
-            token,
-            user_id,
-            safe_source,
-            safe_dashboards,
-        )
-        return True
-
-    refresh_linked_dashboards_task.delay(
-        token,
-        user_id,
-        safe_source,
-        safe_dashboards,
-    )
-    return True
-
-
-def sync_due_data_sources(
-    user_id: int,
-    token: str,
-    background_tasks: BackgroundTasks | None = None,
-) -> list[dict]:
+def sync_due_data_sources(user_id: int, token: str) -> list[dict]:
     manager_data_sources = data_source_manager.ManagerDataSources()
     synced = []
 
@@ -329,18 +350,20 @@ def sync_due_data_sources(
                 data_source_id=source["id"],
             )
 
-            refresh_queued = enqueue_linked_dashboard_refresh(
-                token=token,
-                user_id=user_id,
-                source=updated_source or source,
-                dashboards=dashboards,
-                background_tasks=background_tasks,
-            )
+            refreshed_dashboards = []
+
+            if dashboards:
+                refreshed_dashboards = refresh_linked_dashboards_after_source_sync(
+                    token=token,
+                    user_id=user_id,
+                    source=updated_source or source,
+                    dashboards=dashboards,
+                )
 
             synced.append({
                 "data_source": updated_source,
                 "dashboards": dashboards,
-                "refresh_queued": refresh_queued,
+                "refreshed_dashboards": refreshed_dashboards,
             })
         except Exception as error:
             synced.append({
@@ -507,9 +530,9 @@ def create_data_source(
 
 
 @app.post("/data-sources", status_code=status.HTTP_200_OK)
-def select_data_sources(data: data_source_models.WithToken, background_tasks: BackgroundTasks):
+def select_data_sources(data: data_source_models.WithToken):
     user_id = get_user_id_from_token(data.token)
-    synced_sources = sync_due_data_sources(user_id, data.token, background_tasks)
+    synced_sources = sync_due_data_sources(user_id, data.token)
     owned = data_source_manager.ManagerDataSources().select_data_sources_by_user(user_id=user_id)
     shared = collaborations.select_shared_data_sources(user_id)
 
@@ -566,7 +589,6 @@ def select_linked_dashboards(data: data_source_models.GetDataSource):
 
 @app.patch("/data-source/update", status_code=status.HTTP_200_OK)
 def update_data_source(
-    background_tasks: BackgroundTasks,
     token: str = Form(...),
     data_source_id: int = Form(...),
     refresh_dashboards: bool = Form(False),
@@ -645,13 +667,6 @@ def update_data_source(
         charts_manager.ManagerCharts().mark_dashboards_outdated_by_data_source(
             data_source_id=data_source_id,
         )
-        enqueue_linked_dashboard_refresh(
-            token=token,
-            user_id=access["owner_user_id"],
-            source=data_source,
-            dashboards=linked_dashboards,
-            background_tasks=background_tasks,
-        )
 
     return {
         "data_source": data_source,
@@ -659,9 +674,8 @@ def update_data_source(
         "linked_dashboards_count": len(linked_dashboards),
         "refresh_dashboards": refresh_dashboards,
         "dashboards_marked_outdated": bool(refresh_dashboards and linked_dashboards),
-        "dashboards_refresh_queued": bool(refresh_dashboards and linked_dashboards),
         "message": (
-            "Fonte atualizada. Dashboards ligados foram agendados para atualizacao."
+            "Fonte atualizada. Dashboards ligados foram marcados para atualização."
             if refresh_dashboards and linked_dashboards
             else "Fonte atualizada."
         ),
@@ -759,16 +773,16 @@ def finish_dashboard_refresh(data: dict = Body(...)):
     prompt = data.get("prompt")
 
     if not token:
-        raise ValueError("token e obrigatorio.")
+        raise ValueError("token é obrigatório.")
 
     if not dashboard_id:
-        raise ValueError("dashboard_id e obrigatorio.")
+        raise ValueError("dashboard_id é obrigatório.")
 
     if ai_suggestion is None:
-        raise ValueError("ai_suggestion e obrigatorio.")
+        raise ValueError("ai_suggestion é obrigatório.")
 
     if not isinstance(charts, list) or not charts:
-        raise ValueError("charts precisa ser uma lista com pelo menos um grafico.")
+        raise ValueError("charts precisa ser uma lista com pelo menos um gráfico.")
 
     user_id = get_user_id_from_token(token)
 
@@ -795,7 +809,7 @@ def save_chart_settings(data: chart_models.SaveChartSettings):
     if not dashboard or dashboard["access_permission"] not in ("owner", "edit", "full"):
         return {
             "status": False,
-            "message": "Dashboard nao encontrado ou nao pertence ao usuario.",
+            "message": "Dashboard não encontrado ou não pertence ao usuário.",
         }
 
     if data.chart_id:
@@ -804,7 +818,7 @@ def save_chart_settings(data: chart_models.SaveChartSettings):
         if data.chart_id not in chart_ids:
             return {
                 "status": False,
-                "message": "Grafico nao encontrado ou nao pertence ao dashboard.",
+                "message": "Gráfico não encontrado ou não pertence ao dashboard.",
             }
 
     settings = charts_manager.ManagerCharts().save_chart_settings(
