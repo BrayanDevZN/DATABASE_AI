@@ -2,7 +2,6 @@ from datetime import date, datetime
 import json
 import math
 
-import pandas as pd
 from sqlalchemy import text
 
 from connect.manager_database import main_database
@@ -35,21 +34,18 @@ class RepositoryDataSources:
                 for item in value
             ]
 
-        if isinstance(value, pd.Timestamp):
-            return value.isoformat()
-
         if isinstance(value, (datetime, date)):
             return value.isoformat()
 
         if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
             return None
 
-        if pd.isna(value) if not isinstance(value, (list, dict, tuple, str)) else False:
+        if value is None:
             return None
 
         if hasattr(value, "item"):
             try:
-                return value.item()
+                return self._make_json_safe(value.item())
             except Exception:
                 return value
 

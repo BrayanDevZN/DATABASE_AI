@@ -1,9 +1,10 @@
 import io
 import json
+import math
 import os
 from datetime import date, datetime
 
-import pandas as pd
+import polars as pl
 import requests
 
 from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile, status
@@ -50,22 +51,44 @@ def make_json_safe(value):
     if isinstance(value, tuple):
         return [make_json_safe(item) for item in value]
 
-    if isinstance(value, pd.Timestamp):
-        return value.isoformat()
-
     if isinstance(value, (datetime, date)):
         return value.isoformat()
 
-    if pd.isna(value) if not isinstance(value, (list, dict, tuple, str)) else False:
+    if value is None:
+        return None
+
+    if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
         return None
 
     if hasattr(value, "item"):
         try:
-            return value.item()
+            return make_json_safe(value.item())
         except Exception:
             return value
 
     return value
+
+
+def clean_dataframe(df: pl.DataFrame) -> pl.DataFrame:
+    if df.width:
+        df = df.filter(~pl.all_horizontal(pl.all().is_null()))
+
+    df = df.select([
+        column for column in df.columns
+        if df[column].null_count() < df.height
+    ])
+
+    df.columns = [str(column).strip() for column in df.columns]
+
+    float_columns = [
+        column for column, dtype in df.schema.items()
+        if dtype in (pl.Float32, pl.Float64)
+    ]
+
+    if float_columns:
+        df = df.with_columns(pl.col(float_columns).fill_nan(None))
+
+    return df
 
 
 def get_user_id_from_token(token: str) -> int:
@@ -106,23 +129,18 @@ def read_uploaded_file(file: UploadFile) -> tuple[list[dict], int, int]:
     filename = file.filename.lower()
 
     if filename.endswith(".csv"):
-        df = pd.read_csv(io.BytesIO(content))
+        df = pl.read_csv(io.BytesIO(content))
     elif filename.endswith(".xlsx") or filename.endswith(".xls"):
-        df = pd.read_excel(io.BytesIO(content))
+        df = pl.read_excel(io.BytesIO(content))
     elif filename.endswith(".json"):
-        df = pd.read_json(io.BytesIO(content))
+        df = pl.read_json(io.BytesIO(content))
     else:
         raise ValueError("Formato inválido. Envie CSV, XLSX, XLS ou JSON.")
 
-    df = df.dropna(how="all")
-    df = df.where(pd.notnull(df), None)
+    df = clean_dataframe(df)
 
-    for column in df.columns:
-        if pd.api.types.is_datetime64_any_dtype(df[column]):
-            df[column] = df[column].astype(str)
-
-    file_data = make_json_safe(df.to_dict(orient="records"))
-    row_count = len(df)
+    file_data = make_json_safe(df.to_dicts())
+    row_count = df.height
     column_count = len(df.columns)
 
     return file_data, row_count, column_count
@@ -140,16 +158,11 @@ def normalize_rows(rows) -> tuple[list[dict], int, int]:
     if not isinstance(rows, list):
         raise ValueError("A fonte precisa retornar uma lista de registros.")
 
-    df = pd.DataFrame(rows)
-    df = df.dropna(how="all")
-    df = df.where(pd.notnull(df), None)
+    df = pl.from_dicts(rows, infer_schema_length=None)
+    df = clean_dataframe(df)
 
-    for column in df.columns:
-        if pd.api.types.is_datetime64_any_dtype(df[column]):
-            df[column] = df[column].astype(str)
-
-    file_data = make_json_safe(df.to_dict(orient="records"))
-    row_count = len(df)
+    file_data = make_json_safe(df.to_dicts())
+    row_count = df.height
     column_count = len(df.columns)
 
     return file_data, row_count, column_count

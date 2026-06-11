@@ -1,8 +1,6 @@
 from datetime import date, datetime
 import math
 
-import pandas as pd
-
 from app.app_data_sources.repository import RepositoryDataSources
 
 
@@ -29,13 +27,10 @@ class ServiceDataSources:
                 for item in value
             ]
 
-        if isinstance(value, pd.Timestamp):
-            return value.isoformat()
-
         if isinstance(value, (datetime, date)):
             return value.isoformat()
 
-        if pd.isna(value) if not isinstance(value, (list, dict, tuple, str)) else False:
+        if value is None:
             return None
 
         if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
@@ -43,7 +38,7 @@ class ServiceDataSources:
 
         if hasattr(value, "item"):
             try:
-                return value.item()
+                return self._make_json_safe(value.item())
             except Exception:
                 return value
 

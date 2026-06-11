@@ -30,7 +30,7 @@ Principais responsabilidades:
 | Pydantic | Validacao dos modelos de entrada |
 | SQLAlchemy | Execucao de consultas SQL externas e suporte de persistencia |
 | PostgreSQL / psycopg | Banco relacional em producao |
-| pandas | Leitura e normalizacao de CSV, Excel, JSON e dados externos |
+| Polars | Leitura e normalizacao de CSV, Excel, JSON e dados externos |
 | python-jose | Criacao e leitura de JWT |
 | passlib / bcrypt | Hash e verificacao de senhas |
 | requests | Chamada para a API de IA e APIs externas |
@@ -82,26 +82,26 @@ O projeto segue uma separacao simples por dominio:
 
 ```text
 DATABASE/
-├── api/
-│   ├── routes.py
-│   └── model/
-│       ├── model_accounts.py
-│       ├── model_charts.py
-│       ├── model_collaboration.py
-│       ├── model_conversation.py
-│       └── model_data_source.py
-├── app/
-│   ├── app_accounts/
-│   ├── app_charts/
-│   ├── app_collaborations/
-│   ├── app_conversations/
-│   └── app_data_sources/
-├── auth/
-├── connect/
-├── core/
-├── Procfile
-├── requirements.txt
-└── readme.md
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ api/
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ routes.py
+Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ model/
+Ã¢â€â€š       Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ model_accounts.py
+Ã¢â€â€š       Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ model_charts.py
+Ã¢â€â€š       Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ model_collaboration.py
+Ã¢â€â€š       Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ model_conversation.py
+Ã¢â€â€š       Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ model_data_source.py
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ app/
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ app_accounts/
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ app_charts/
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ app_collaborations/
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ app_conversations/
+Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ app_data_sources/
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ auth/
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ connect/
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ core/
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ Procfile
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ requirements.txt
+Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ readme.md
 ```
 
 ## Variaveis de ambiente
