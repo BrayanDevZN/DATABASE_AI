@@ -809,3 +809,5 @@ DATABASE /data-sources
 ## Status da pasta de migrations
 
 A pasta `migrations/` foi removida deste reposititorio conforme decisao do projeto. Caso o time volte a usar versionamento formal de schema, recomenda-se recriar uma estrutura controlada com Alembic ou ferramenta equivalente.
+
+<!-- README atualizado para manter a documentacao do projeto sincronizada. -->
