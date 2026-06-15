@@ -1,151 +1,235 @@
-# DataPilot Accounts, Data Sources and Dashboards API
+# DataPilot Database API
 
-API principal de persistencia do DataPilot. Este servico concentra autenticacao, usuarios, conversas, fontes de dados, dashboards, graficos, colaboracoes e notificacoes. Ele tambem faz a ponte entre dados cadastrados pelo usuario e a API de IA responsavel por gerar analises.
+[![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-API-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-ORM-D71F00?style=for-the-badge&logo=sqlalchemy&logoColor=white)](https://www.sqlalchemy.org/)
+[![Pydantic](https://img.shields.io/badge/Pydantic-Validation-E92063?style=for-the-badge&logo=pydantic&logoColor=white)](https://docs.pydantic.dev/)
+[![Polars](https://img.shields.io/badge/Polars-DataFrames-CD792C?style=for-the-badge&logo=polars&logoColor=white)](https://pola.rs/)
+[![JWT](https://img.shields.io/badge/JWT-Auth-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white)](https://jwt.io/)
+[![Railway](https://img.shields.io/badge/Railway-Deploy-0B0D0E?style=for-the-badge&logo=railway&logoColor=white)](https://railway.app/)
+
+API principal de persistencia e operacao do DataPilot. Este servico centraliza contas, autenticacao, conversas, fontes de dados, dashboards, graficos, colaboracoes, convites, notificacoes e sincronizacao com a API de IA.
+
+Apesar do nome `DATABASE`, este repositorio nao e apenas uma camada de banco. Ele e o backend operacional do SaaS: recebe comandos do frontend, valida identidade, salva entidades do produto, controla permissoes e mantem a ponte entre dados cadastrados pelo usuario e dashboards gerados pelo agente de IA.
+
+## Indice
+
+- [Visao geral](#visao-geral)
+- [Como a plataforma funciona](#como-a-plataforma-funciona)
+- [Arquitetura](#arquitetura)
+- [Tecnologias](#tecnologias)
+- [Dominios da API](#dominios-da-api)
+- [Fluxos principais](#fluxos-principais)
+- [Autenticacao](#autenticacao)
+- [Rotas](#rotas)
+- [Fontes de dados](#fontes-de-dados)
+- [Dashboards e graficos](#dashboards-e-graficos)
+- [Colaboracao e permissoes](#colaboracao-e-permissoes)
+- [Variaveis de ambiente](#variaveis-de-ambiente)
+- [Como executar](#como-executar)
+- [Estrutura de pastas](#estrutura-de-pastas)
+- [Seguranca e confiabilidade](#seguranca-e-confiabilidade)
+- [Resumo tecnico para recrutadores](#resumo-tecnico-para-recrutadores)
 
 ## Visao geral
 
-O projeto `DATABASE` e o backend operacional da plataforma. Apesar do nome, ele nao e apenas banco de dados: e uma API FastAPI completa para gerenciar o estado do produto.
+O DataPilot e um SaaS de Business Intelligence com IA. A API `DATABASE` e responsavel por manter o estado do produto: usuarios, sessoes, fontes, dashboards, graficos, convites e notificacoes.
 
-Principais responsabilidades:
+Responsabilidades principais:
 
-- cadastro, login e validacao de usuarios;
-- envio de codigos por e-mail para criacao e recuperacao de senha;
-- gerenciamento de perfil, username e foto;
-- persistencia de conversas e mensagens;
-- criacao e atualizacao de fontes de dados;
-- leitura de arquivos, APIs externas e bancos SQL;
-- criacao, listagem, atualizacao e exclusao de dashboards;
-- salvamento de graficos e configuracoes visuais;
-- compartilhamento de dashboards com permissoes;
-- notificacoes sobre convites e atualizacoes;
-- sincronizacao automatica de fontes com dashboards vinculados.
+- criar contas com validacao por codigo de e-mail;
+- autenticar usuarios e emitir JWT;
+- validar token e recuperar dados do usuario autenticado;
+- atualizar nome, username, foto de perfil e senha;
+- excluir conta e dados relacionados;
+- persistir conversas e mensagens usadas pelo chat da IA;
+- cadastrar fontes por arquivo, API externa ou banco SQL;
+- normalizar dados tabulares usando Polars;
+- salvar dashboards e graficos gerados pelo AI Agent;
+- atualizar dashboards quando uma fonte vinculada muda;
+- compartilhar dashboards entre usuarios com niveis de permissao;
+- gerenciar convites, notificacoes e pessoas com acesso;
+- chamar a API de IA para refresh automatico de dashboards.
 
-## Tecnologias
+## Como a plataforma funciona
 
-| Tecnologia | Uso no projeto |
-| --- | --- |
-| Python | Linguagem principal |
-| FastAPI | Framework HTTP da API |
-| Uvicorn | Servidor ASGI |
-| Pydantic | Validacao dos modelos de entrada |
-| SQLAlchemy | Execucao de consultas SQL externas e suporte de persistencia |
-| PostgreSQL / psycopg | Banco relacional em producao |
-| Polars | Leitura e normalizacao de CSV, Excel, JSON e dados externos |
-| python-jose | Criacao e leitura de JWT |
-| passlib / bcrypt | Hash e verificacao de senhas |
-| requests | Chamada para a API de IA e APIs externas |
-| resend | Envio de e-mails transacionais |
-| python-multipart | Upload de arquivos via FormData |
-| Railway | Deploy da API |
+```text
+Frontend React
+    |
+    | Login, fontes, dashboards, colaboracoes
+    v
+DataPilot Database API
+    |
+    +--> PostgreSQL
+    |       - usuarios
+    |       - validacoes
+    |       - conversas
+    |       - fontes
+    |       - dashboards
+    |       - graficos
+    |       - colaboracoes
+    |       - notificacoes
+    |
+    +--> AI Agent API
+            - refresh de dashboard
+            - recalculo de analises
+```
+
+Fluxo de valor:
+
+```text
+Usuario cria conta
+    -> cadastra fonte de dados
+    -> frontend pede dashboard para a IA
+    -> AI Agent gera analise e graficos
+    -> Database API salva dashboard e charts
+    -> usuario customiza, compartilha e atualiza
+```
 
 ## Arquitetura
 
 ```text
-Cliente / Frontend
-      |
-      v
 api/routes.py
-      |
-      +--> auth/
-      |     +--> jwt.py
-      |     +--> hash.py
-      |     +--> auth_sender.py
-      |
-      +--> app/app_accounts/
-      +--> app/app_conversations/
-      +--> app/app_data_sources/
-      +--> app/app_charts/
-      +--> app/app_collaborations/
-      |
-      +--> connect/
+    |
+    +--> api/model/
+    |       +--> model_accounts.py
+    |       +--> model_conversation.py
+    |       +--> model_data_source.py
+    |       +--> model_charts.py
+    |       +--> model_collaboration.py
+    |
+    +--> auth/
+    |       +--> jwt.py
+    |       +--> hash.py
+    |       +--> manager_auth.py
+    |       +--> auth_sender.py
+    |
+    +--> app/app_accounts/
+    +--> app/app_conversations/
+    +--> app/app_data_sources/
+    +--> app/app_charts/
+    +--> app/app_collaborations/
+    |
+    +--> connect/
             +--> database.py
             +--> manager_database.py
 ```
 
 ### Padrao interno
 
-O projeto segue uma separacao simples por dominio:
-
 | Camada | Responsabilidade |
 | --- | --- |
-| `api/routes.py` | Define endpoints, CORS, leitura de arquivos e orquestracoes de alto nivel |
-| `api/model/` | Contratos Pydantic por dominio |
-| `auth/` | JWT, hash de senha e envio de codigos |
-| `connect/` | Conexao e comandos de banco |
-| `app/app_accounts/` | Regras de usuario, login, perfil e senha |
-| `app/app_conversations/` | Conversas e mensagens |
-| `app/app_data_sources/` | Fontes de dados |
-| `app/app_charts/` | Dashboards, graficos e configuracoes |
-| `app/app_collaborations/` | Compartilhamentos, convites e notificacoes |
+| `api/routes.py` | Define endpoints, CORS, leitura de arquivos, validacao de token e orquestracoes de alto nivel. |
+| `api/model/` | Schemas Pydantic dos payloads de entrada. |
+| `auth/` | JWT, hash de senha, validacao de login e envio de codigos por e-mail. |
+| `connect/` | Conexao com PostgreSQL. |
+| `app/app_accounts/` | Regras de usuario, perfil, senha e exclusao de conta. |
+| `app/app_conversations/` | Conversas e mensagens do chat. |
+| `app/app_data_sources/` | CRUD de fontes de dados. |
+| `app/app_charts/` | Dashboards, graficos, configuracoes e refresh. |
+| `app/app_collaborations/` | Compartilhamento, permissoes, convites e notificacoes. |
 
-## Estrutura de pastas
+## Tecnologias
 
-```text
-DATABASE/
-Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ api/
-Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ routes.py
-Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ model/
-Ã¢â€â€š       Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ model_accounts.py
-Ã¢â€â€š       Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ model_charts.py
-Ã¢â€â€š       Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ model_collaboration.py
-Ã¢â€â€š       Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ model_conversation.py
-Ã¢â€â€š       Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ model_data_source.py
-Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ app/
-Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ app_accounts/
-Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ app_charts/
-Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ app_collaborations/
-Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ app_conversations/
-Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ app_data_sources/
-Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ auth/
-Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ connect/
-Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ core/
-Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ Procfile
-Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ requirements.txt
-Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ readme.md
-```
+| Tecnologia | Uso no projeto |
+| --- | --- |
+| Python | Linguagem principal da API. |
+| FastAPI | Framework HTTP, rotas, FormData, upload e middlewares. |
+| Uvicorn | Servidor ASGI usado em desenvolvimento e deploy. |
+| Pydantic | Validacao dos contratos de entrada. |
+| PostgreSQL | Banco relacional principal. |
+| SQLAlchemy | Execucao de queries e conexoes com bancos externos. |
+| psycopg / psycopg2 | Drivers PostgreSQL. |
+| Polars | Leitura, limpeza e normalizacao de CSV, Excel, JSON e dados externos. |
+| python-jose | Criacao e decodificacao de JWT. |
+| bcrypt | Hash e verificacao de senhas. |
+| Resend | Envio de codigos transacionais por e-mail. |
+| Requests | Chamada para API de IA e APIs externas. |
+| python-multipart | Recebimento de uploads via FormData. |
+| Railway | Deploy e execucao em producao. |
 
-## Variaveis de ambiente
+## Dominios da API
 
-As variaveis podem ser configuradas no ambiente local ou no provedor de deploy.
+| Dominio | O que resolve |
+| --- | --- |
+| Accounts | Cadastro, login, perfil, senha, token e exclusao de conta. |
+| Conversations | Conversas e mensagens usadas pelo chat de IA. |
+| Data Sources | Fontes de dados por arquivo, API externa ou banco SQL. |
+| Dashboards | Criacao, listagem, leitura, exclusao, refresh e configuracoes de graficos. |
+| Collaborations | Compartilhamento de dashboards e fontes com permissoes. |
+| Notifications | Convites, atualizacoes automaticas e avisos para usuarios. |
+| AI Integration | Recalculo automatico de dashboards vinculados a fontes sincronizadas. |
 
-| Variavel | Obrigatoria | Descricao |
-| --- | --- | --- |
-| `DATABASE_URL` | Sim | URL de conexao com o banco principal da plataforma |
-| `AI_URL` | Nao | URL da API de IA. Padrao: `https://web-production-40ead.up.railway.app` |
-| `SECRET_KEY` ou equivalente JWT | Sim | Segredo usado para assinar tokens |
-| `RESEND_API_KEY` | Sim para e-mail | Chave para envio de codigos por e-mail |
-| `EMAIL_FROM` | Sim para e-mail | Remetente usado nos envios |
-| `PORT` | Deploy | Porta definida pelo Railway/ambiente |
+## Fluxos principais
 
-Consulte os arquivos em `auth/`, `connect/` e `core/` para nomes finais usados na sua configuracao atual.
-
-## Como executar localmente
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn api.routes:app --reload --host 0.0.0.0 --port 8000
-```
-
-No Windows PowerShell:
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-uvicorn api.routes:app --reload --host 0.0.0.0 --port 8000
-```
-
-O `Procfile` de producao usa:
+### 1. Criacao de conta
 
 ```text
-web: uvicorn api.routes:app --host 0.0.0.0 --port $PORT
+POST /env_code_create
+    -> gera codigo de 6 digitos
+    -> envia e-mail via Resend
+    -> salva em validation_account
+
+POST /create_user
+    -> valida codigo
+    -> cria usuario com senha em bcrypt
+    -> retorna token de login
+```
+
+### 2. Login
+
+```text
+POST /login
+    -> busca usuario por e-mail
+    -> compara senha com hash
+    -> gera JWT com user_id, email, role e status
+```
+
+### 3. Criacao de fonte
+
+```text
+POST /data-source/create
+    -> valida JWT
+    -> recebe arquivo, API externa ou banco SQL
+    -> normaliza dados com Polars
+    -> salva file_data, row_count e column_count
+```
+
+### 4. Geracao de dashboard
+
+```text
+AI Agent gera analise
+    -> POST /dashboard/create
+    -> POST /dashboard/chart/create
+    -> frontend abre dashboard salvo
+```
+
+### 5. Atualizacao de fonte com dashboards vinculados
+
+```text
+PATCH /data-source/update
+    -> atualiza a fonte
+    -> identifica dashboards vinculados
+    -> pode marcar dashboards como desatualizados
+    -> frontend ou rotina de sync chama refresh
+```
+
+### 6. Sincronizacao automatica
+
+```text
+POST /data-sources
+    -> detecta fontes vencidas por refresh_interval_days
+    -> recarrega dados da fonte
+    -> busca dashboards vinculados
+    -> chama AI_URL /dashboard/refresh/analyze
+    -> salva refresh com ManagerCharts
+    -> cria notificacoes de sucesso ou falha
 ```
 
 ## Autenticacao
 
-A autenticacao usa JWT. Na maior parte das rotas, o token e enviado no body JSON ou no `FormData` com o campo `token`.
+A API usa JWT assinado com `SECRET`. O token e enviado no body JSON ou em `multipart/form-data`, dependendo da rota.
 
 Exemplo:
 
@@ -155,69 +239,36 @@ Exemplo:
 }
 ```
 
-O helper `get_user_id_from_token` extrai o `user_id` do token. Quando o token e invalido, a API retorna erro de permissao ou mensagem de token invalido.
+O helper `get_user_id_from_token`:
 
-## Rotas de usuarios e autenticacao
+- decodifica o JWT;
+- extrai `user_id`;
+- confirma que o usuario ainda existe;
+- retorna `401` quando a sessao esta invalida ou expirada.
 
-### `POST /env_code_create`
+## Rotas
 
-Envia codigo de verificacao para criacao de conta.
+### Accounts e autenticacao
 
-Body:
+| Metodo | Rota | Descricao |
+| --- | --- | --- |
+| `POST` | `/env_code_create` | Envia codigo de verificacao para criacao de conta. |
+| `POST` | `/valid_user` | Verifica se um e-mail ja esta cadastrado. |
+| `POST` | `/valid_username` | Verifica disponibilidade de username. |
+| `POST` | `/create_user` | Cria usuario validando codigo enviado por e-mail. |
+| `POST` | `/login` | Autentica usuario e retorna token. |
+| `POST` | `/valid_token` | Valida JWT. |
+| `POST` | `/me` | Retorna dados do usuario autenticado. |
+| `POST` | `/env_pass` | Envia codigo de recuperacao/troca de senha. |
+| `POST` | `/check_pass` | Confirma senha atual antes de alterar. |
+| `PATCH` | `/update_auth_pass` | Redefine senha com codigo. |
+| `PATCH` | `/update_pass` | Atualiza senha no fluxo autenticado. |
+| `PATCH` | `/update_name` | Atualiza nome. |
+| `PATCH` | `/update_username` | Atualiza username. |
+| `PATCH` | `/update_profile_image` | Atualiza foto de perfil. |
+| `DELETE` | `/delete_user` | Exclui conta e dados relacionados. |
 
-```json
-{
-  "email": "usuario@email.com"
-}
-```
-
-### `POST /valid_user`
-
-Verifica se um e-mail ja existe.
-
-Body:
-
-```json
-{
-  "email": "usuario@email.com"
-}
-```
-
-### `POST /valid_username`
-
-Verifica disponibilidade de username.
-
-Body:
-
-```json
-{
-  "username": "usuario123"
-}
-```
-
-### `POST /create_user`
-
-Cria uma conta e retorna dados de autenticacao.
-
-Body:
-
-```json
-{
-  "email": "usuario@email.com",
-  "password": "senha_segura",
-  "name": "Nome do Usuario",
-  "username": "usuario123",
-  "age": 25,
-  "gender": "masculino",
-  "code": 123456
-}
-```
-
-### `POST /login`
-
-Autentica o usuario.
-
-Body:
+Exemplo de login:
 
 ```json
 {
@@ -226,162 +277,33 @@ Body:
 }
 ```
 
-### `POST /valid_token`
-
-Valida um JWT.
-
-Body:
+Exemplo de resposta:
 
 ```json
 {
-  "token": "JWT_DO_USUARIO"
+  "exists": true,
+  "status": true,
+  "token": "JWT",
+  "name": "Nome",
+  "username": "usuario",
+  "profile_image": null,
+  "gender": "masculino",
+  "age": 25
 }
 ```
 
-### `POST /me`
+### Conversations
 
-Retorna dados do usuario autenticado.
+| Metodo | Rota | Descricao |
+| --- | --- | --- |
+| `POST` | `/conversation/create` | Cria conversa vazia com titulo. |
+| `POST` | `/conversation` | Salva mensagem de usuario ou assistente. |
+| `POST` | `/conversations` | Lista conversas do usuario. |
+| `POST` | `/conversation/messages` | Lista mensagens de uma conversa. |
+| `POST` | `/conversation/user` | Lista conversas agrupadas por usuario autenticado. |
+| `DELETE` | `/conversation` | Remove conversa. |
 
-Body:
-
-```json
-{
-  "token": "JWT_DO_USUARIO"
-}
-```
-
-### `POST /check_pass`
-
-Valida a senha atual antes de altera-la.
-
-Body:
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "current_password": "senha_atual",
-  "password": "nova_senha"
-}
-```
-
-### `PATCH /update_pass`
-
-Atualiza a senha em fluxo autenticado.
-
-Body:
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "current_password": "senha_atual",
-  "password": "nova_senha"
-}
-```
-
-### `POST /env_pass`
-
-Envia codigo para recuperacao de senha. Pode receber `email` ou `token`, dependendo do fluxo.
-
-Body:
-
-```json
-{
-  "email": "usuario@email.com"
-}
-```
-
-ou:
-
-```json
-{
-  "token": "JWT_DO_USUARIO"
-}
-```
-
-### `PATCH /update_auth_pass`
-
-Redefine senha com codigo.
-
-Body:
-
-```json
-{
-  "email": "usuario@email.com",
-  "code": 123456,
-  "password": "nova_senha"
-}
-```
-
-ou:
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "code": 123456,
-  "password": "nova_senha"
-}
-```
-
-### `PATCH /update_name`
-
-Atualiza nome do usuario.
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "name": "Novo Nome"
-}
-```
-
-### `PATCH /update_username`
-
-Atualiza username.
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "username": "novo_username"
-}
-```
-
-### `PATCH /update_profile_image`
-
-Atualiza imagem de perfil.
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "profile_image": "base64_ou_url"
-}
-```
-
-### `DELETE /delete_user`
-
-Remove a conta do usuario e dados relacionados.
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "password": "senha_atual"
-}
-```
-
-## Rotas de conversas
-
-### `POST /conversation/create`
-
-Cria uma conversa vazia.
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "title": "Analise de vendas"
-}
-```
-
-### `POST /conversation`
-
-Salva uma mensagem.
+Exemplo:
 
 ```json
 {
@@ -392,422 +314,236 @@ Salva uma mensagem.
 }
 ```
 
-`role` aceita `user` ou `assistant`.
+### Data Sources
 
-### `POST /conversations`
-
-Lista conversas do usuario.
-
-```json
-{
-  "token": "JWT_DO_USUARIO"
-}
-```
-
-### `POST /conversation/messages`
-
-Lista mensagens de uma conversa.
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "conversation_id": 1
-}
-```
-
-### `POST /conversation/user`
-
-Lista conversas agrupadas por usuario autenticado.
-
-```json
-{
-  "token": "JWT_DO_USUARIO"
-}
-```
-
-### `DELETE /conversation`
-
-Remove uma conversa.
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "conversation_id": 1
-}
-```
-
-## Rotas de fontes de dados
-
-As fontes podem ser de tres tipos:
-
-| Tipo | Campo `source_type` | Entrada |
+| Metodo | Rota | Descricao |
 | --- | --- | --- |
-| Arquivo | `file` | CSV, XLS, XLSX ou JSON |
-| API externa | `web` | `api_url` ou `api_payload` |
-| Banco SQL | `database` | `database_url` + query `SELECT` |
+| `POST` | `/data-source/create` | Cria fonte por arquivo, API externa ou banco SQL. |
+| `POST` | `/data-sources` | Lista fontes proprias e compartilhadas, alem de sincronizar fontes vencidas. |
+| `POST` | `/data-source` | Retorna fonte especifica. |
+| `POST` | `/data-source/linked-dashboards` | Lista dashboards vinculados a uma fonte. |
+| `PATCH` | `/data-source/update` | Atualiza os dados ou conexao da fonte. |
+| `PATCH` | `/data-source/rename` | Renomeia fonte. |
+| `DELETE` | `/data-source` | Remove fonte. |
 
-### `POST /data-source/create`
+### Dashboards e charts
 
-Cria uma fonte de dados.
+| Metodo | Rota | Descricao |
+| --- | --- | --- |
+| `POST` | `/dashboards` | Lista dashboards proprios, compartilhados e convites. |
+| `POST` | `/dashboard` | Busca dashboard com graficos. |
+| `POST` | `/dashboard/create` | Cria dashboard persistido. |
+| `POST` | `/dashboard/chart/create` | Cria grafico dentro de um dashboard. |
+| `POST` | `/dashboard/refresh/finish` | Salva resultado de refresh gerado pela IA. |
+| `POST` | `/dashboard/chart/settings` | Salva configuracoes visuais de graficos. |
+| `DELETE` | `/dashboard` | Exclui dashboard. |
 
-Content-Type: `multipart/form-data`
+### Collaborations
 
-Campos:
+| Metodo | Rota | Descricao |
+| --- | --- | --- |
+| `POST` | `/users/search` | Busca usuarios por nome ou username. |
+| `POST` | `/collaborations` | Retorna visao geral de dashboards, compartilhados e convites. |
+| `POST` | `/dashboard/collaborations` | Lista colaboradores de um dashboard. |
+| `POST` | `/dashboard/collaboration/share` | Envia convite de compartilhamento. |
+| `PATCH` | `/dashboard/collaboration` | Atualiza permissao de colaborador. |
+| `DELETE` | `/dashboard/collaboration` | Remove colaboracao. |
+| `POST` | `/dashboard/collaboration/respond` | Aceita ou recusa convite. |
+| `POST` | `/dashboard/access` | Lista pessoas com acesso ao dashboard. |
+
+### Notifications
+
+| Metodo | Rota | Descricao |
+| --- | --- | --- |
+| `POST` | `/notifications` | Lista notificacoes do usuario. |
+| `PATCH` | `/notification/read` | Marca notificacao como lida. |
+
+## Fontes de dados
+
+A API aceita tres tipos de fonte.
+
+| `source_type` | Entrada | Tratamento |
+| --- | --- | --- |
+| `file` | CSV, XLS, XLSX ou JSON | Leitura com Polars, limpeza de nulos e conversao para lista de registros. |
+| `web` | URL de API ou payload JSON | Requisicao HTTP ou payload enviado pelo frontend, normalizado como tabela. |
+| `database` | Connection string + query `SELECT` | Execucao via SQLAlchemy e conversao para registros. |
+
+Campos de `multipart/form-data`:
 
 | Campo | Obrigatorio | Descricao |
 | --- | --- | --- |
-| `token` | Sim | JWT do usuario |
-| `name` | Sim | Nome da fonte |
-| `source_type` | Nao | `file`, `web` ou `database`. Padrao: `file` |
-| `file` | Para `file` | Arquivo CSV/XLS/XLSX/JSON |
-| `api_url` | Para `web` | URL de API externa |
-| `api_payload` | Opcional | JSON ja carregado pelo frontend |
-| `database_url` | Para `database` | String de conexao |
-| `query` | Para `database` | Consulta SQL somente `SELECT` |
-| `refresh_interval_days` | Nao | Intervalo de sincronizacao automatica |
+| `token` | Sim | JWT do usuario. |
+| `name` | Sim na criacao | Nome visivel da fonte. |
+| `source_type` | Nao | `file`, `web` ou `database`. Padrao: `file`. |
+| `file` | Para `file` | Arquivo CSV, XLS, XLSX ou JSON. |
+| `api_url` | Para `web` | URL da API externa. |
+| `api_payload` | Opcional | JSON ja carregado pelo frontend. |
+| `database_url` | Para `database` | String de conexao. |
+| `query` | Para `database` | Query SQL somente `SELECT`. |
+| `refresh_interval_days` | Opcional | Intervalo de sincronizacao automatica. |
+| `refresh_dashboards` | Update | Marca dashboards vinculados para atualizacao. |
 
-### `POST /data-sources`
+## Dashboards e graficos
 
-Lista fontes do usuario, fontes compartilhadas e sincroniza fontes vencidas.
+O dashboard e salvo em duas etapas:
 
-```json
-{
-  "token": "JWT_DO_USUARIO"
-}
+1. `/dashboard/create` cria a entidade principal.
+2. `/dashboard/chart/create` persiste cada grafico com dados e configuracao.
+
+Configuracoes suportadas em `/dashboard/chart/settings`:
+
+- `chart_color`;
+- `chart_background`;
+- `x_axis_text_color`;
+- `y_axis_text_color`;
+- `grid_color`;
+- `grid_style`;
+- `bar_style`;
+- `show_legend`;
+- `pie_colors`.
+
+Refresh:
+
+```text
+AI Agent
+    -> POST /dashboard/refresh/analyze
+Database API
+    -> POST /dashboard/refresh/finish
+    -> substitui graficos
+    -> salva nova analise
+    -> atualiza prompt quando enviado
 ```
 
-### `POST /data-source`
-
-Retorna uma fonte especifica.
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "data_source_id": 1
-}
-```
-
-### `POST /data-source/linked-dashboards`
-
-Lista dashboards vinculados a uma fonte.
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "data_source_id": 1
-}
-```
-
-### `PATCH /data-source/update`
-
-Atualiza dados de uma fonte. Tambem pode marcar dashboards vinculados como desatualizados.
-
-Content-Type: `multipart/form-data`
-
-Campos principais:
-
-- `token`
-- `data_source_id`
-- `refresh_dashboards`
-- `source_type`
-- `file`
-- `api_url`
-- `api_payload`
-- `database_url`
-- `query`
-- `refresh_interval_days`
-
-### `PATCH /data-source/rename`
-
-Renomeia uma fonte.
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "data_source_id": 1,
-  "name": "Novo nome"
-}
-```
-
-### `DELETE /data-source`
-
-Remove uma fonte.
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "data_source_id": 1
-}
-```
-
-## Rotas de dashboards e graficos
-
-### `POST /dashboards`
-
-Lista dashboards do usuario, dashboards compartilhados e convites.
-
-```json
-{
-  "token": "JWT_DO_USUARIO"
-}
-```
-
-### `POST /dashboard`
-
-Busca um dashboard com seus graficos.
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "dashboard_id": 1
-}
-```
-
-### `POST /dashboard/create`
-
-Cria um dashboard persistido. Normalmente e chamado pela API de IA apos gerar analise.
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "title": "Dashboard Comercial",
-  "prompt": "Analise vendas mensais",
-  "ai_suggestion": "Resumo gerado pela IA",
-  "file_name": "vendas.xlsx",
-  "data_source_id": 1
-}
-```
-
-### `POST /dashboard/chart/create`
-
-Cria um grafico dentro de um dashboard.
-
-```json
-{
-  "dashboard_id": 1,
-  "chart_type": "bar",
-  "title": "Receita por categoria",
-  "chart_data": {
-    "data": []
-  },
-  "chart_config": {}
-}
-```
-
-### `POST /dashboard/refresh/finish`
-
-Salva resultado de uma atualizacao gerada pela IA.
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "dashboard_id": 1,
-  "prompt": "Novo prompt",
-  "ai_suggestion": "Nova analise",
-  "charts": []
-}
-```
-
-### `POST /dashboard/chart/settings`
-
-Salva configuracoes visuais de dashboard ou grafico.
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "dashboard_id": 1,
-  "chart_id": 10,
-  "chart_color": "#4f46e5",
-  "chart_background": "#f8fafc",
-  "x_axis_text_color": "#0f172a",
-  "y_axis_text_color": "#0f172a",
-  "grid_color": "#cbd5e1",
-  "grid_style": "3 3",
-  "bar_style": "rounded",
-  "show_legend": true,
-  "pie_colors": ["#4f46e5", "#06b6d4"]
-}
-```
-
-### `DELETE /dashboard`
-
-Remove dashboard.
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "dashboard_id": 1
-}
-```
-
-## Rotas de colaboracao
+## Colaboracao e permissoes
 
 Permissoes aceitas:
 
 | Permissao | Significado |
 | --- | --- |
-| `read` | Apenas visualizar |
-| `edit` | Editar configuracoes e conteudo permitido |
-| `full` | Acesso amplo, incluindo atualizacoes vinculadas |
+| `read` | Pode visualizar dashboard. |
+| `edit` | Pode editar configuracoes permitidas. |
+| `full` | Pode atualizar analises e acessar recursos mais amplos. |
 
-### `POST /users/search`
+O backend verifica acesso antes de listar fontes, dashboards e colaboradores. Fontes compartilhadas tambem sao resolvidas a partir dos dashboards aos quais o usuario possui acesso.
 
-Busca usuarios por username/nome para compartilhar.
+## Variaveis de ambiente
 
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "query": "ana"
-}
+As variaveis sao carregadas por `core/config.py`, que le `core/.env`.
+
+| Variavel | Obrigatoria | Descricao |
+| --- | --- | --- |
+| `DB_NAME` | Sim | Nome do banco PostgreSQL. |
+| `DB_USER` | Sim | Usuario do banco. |
+| `DB_PORT` | Sim | Porta do banco. |
+| `DB_HOST` | Sim | Host do banco. |
+| `DB_PASSWORD` | Sim | Senha do banco. |
+| `SECRET` | Sim | Chave usada para assinar JWT. |
+| `KEY_EMAIL` | Sim para e-mail | Chave da Resend. |
+| `EMAIL_USER` | Opcional | E-mail/remetente configurado. |
+| `URL_EMAIL` | Opcional | URL relacionada ao fluxo de e-mail. |
+| `AI_URL` | Nao | URL da API de IA. Padrao: `https://web-production-40ead.up.railway.app`. |
+| `PORT` | Deploy | Porta usada pelo provedor de deploy. |
+
+Exemplo:
+
+```env
+DB_NAME=postgres
+DB_USER=postgres
+DB_PORT=5432
+DB_HOST=localhost
+DB_PASSWORD=senha
+SECRET=uma_chave_segura
+KEY_EMAIL=re_...
+AI_URL=http://localhost:8001
 ```
 
-### `POST /collaborations`
+## Como executar
 
-Retorna visao geral de dashboards, compartilhados e convites.
+### Windows PowerShell
 
-```json
-{
-  "token": "JWT_DO_USUARIO"
-}
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn api.routes:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### `POST /dashboard/collaborations`
+### Linux/macOS
 
-Lista colaboradores de um dashboard.
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "dashboard_id": 1
-}
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn api.routes:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### `POST /dashboard/collaboration/share`
-
-Compartilha dashboard com outro usuario.
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "dashboard_id": 1,
-  "username": "colega",
-  "permission": "edit"
-}
-```
-
-### `PATCH /dashboard/collaboration`
-
-Atualiza permissao de colaborador.
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "collaboration_id": 1,
-  "permission": "full"
-}
-```
-
-### `DELETE /dashboard/collaboration`
-
-Remove colaboracao.
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "collaboration_id": 1
-}
-```
-
-### `POST /dashboard/collaboration/respond`
-
-Aceita ou recusa convite.
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "collaboration_id": 1,
-  "response": "accepted"
-}
-```
-
-`response` aceita `accepted` ou `declined`.
-
-### `POST /dashboard/access`
-
-Lista pessoas com acesso ao dashboard.
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "dashboard_id": 1
-}
-```
-
-## Rotas de notificacoes
-
-### `POST /notifications`
-
-Lista notificacoes do usuario.
-
-```json
-{
-  "token": "JWT_DO_USUARIO"
-}
-```
-
-### `PATCH /notification/read`
-
-Marca notificacao como lida.
-
-```json
-{
-  "token": "JWT_DO_USUARIO",
-  "notification_id": 1
-}
-```
-
-## Fontes de dados e sincronizacao automatica
-
-Quando `/data-sources` e chamado, a API verifica fontes com `refresh_interval_days` vencido. Para cada fonte vencida:
-
-1. recarrega os dados pela configuracao original;
-2. atualiza a fonte no banco;
-3. busca dashboards vinculados;
-4. chama a API de IA para recalcular dashboards;
-5. salva os dashboards atualizados quando possivel;
-6. cria notificacoes em caso de sucesso ou falha.
-
-## Integracao com a API de IA
-
-A variavel `AI_URL` define para onde a API envia pedidos de reanalise. O fluxo de refresh usa:
+Documentacao local:
 
 ```text
-DATABASE /data-sources
-  -> detecta fonte vencida
-  -> POST {AI_URL}/dashboard/refresh/analyze
-  -> salva resultado via ManagerCharts
+http://localhost:8000/docs
 ```
 
-## Codigos de resposta
+Producao:
 
-| Codigo | Uso |
-| --- | --- |
-| `200 OK` | Consulta, atualizacao ou exclusao bem-sucedida |
-| `201 Created` | Criacao de usuario, conversa, fonte, dashboard, grafico ou colaboracao |
-| `400 Bad Request` | Erro de validacao de regra de negocio |
-| `422 Unprocessable Entity` | Body/FormData fora do schema esperado |
-| `500 Internal Server Error` | Erro inesperado |
+```text
+web: uvicorn api.routes:app --host 0.0.0.0 --port $PORT
+```
 
-## Observacoes de seguranca
+## Estrutura de pastas
 
-- Para fontes `database`, apenas consultas iniciadas com `SELECT` sao aceitas.
-- Tokens sao resolvidos no backend para impedir acesso a dados de outro usuario.
-- Colaboracoes passam por verificacao de permissao antes de listar fontes e dashboards.
-- Senhas devem ser armazenadas apenas com hash.
-- Strings de conexao de banco externo devem ser tratadas como segredo.
+```text
+DATABASE/
+|-- api/
+|   |-- routes.py
+|   `-- model/
+|       |-- model_accounts.py
+|       |-- model_charts.py
+|       |-- model_collaboration.py
+|       |-- model_conversation.py
+|       `-- model_data_source.py
+|-- app/
+|   |-- app_accounts/
+|   |-- app_charts/
+|   |-- app_collaborations/
+|   |-- app_conversations/
+|   `-- app_data_sources/
+|-- auth/
+|   |-- auth_sender.py
+|   |-- dependences.py
+|   |-- hash.py
+|   |-- jwt.py
+|   `-- manager_auth.py
+|-- connect/
+|   |-- database.py
+|   `-- manager_database.py
+|-- core/
+|   `-- config.py
+|-- Procfile
+|-- requirements.txt
+`-- readme.md
+```
 
-## Status da pasta de migrations
+## Seguranca e confiabilidade
 
-A pasta `migrations/` foi removida deste reposititorio conforme decisao do projeto. Caso o time volte a usar versionamento formal de schema, recomenda-se recriar uma estrutura controlada com Alembic ou ferramenta equivalente.
+- Senhas sao armazenadas com hash bcrypt.
+- JWT centraliza identidade e permissao basica.
+- Rotas sensiveis resolvem `user_id` a partir do token, nao do frontend.
+- Recuperacao e criacao de conta usam codigos temporarios.
+- Fontes de banco aceitam apenas queries iniciadas com `SELECT`.
+- Dados tabulares sao normalizados para JSON seguro antes da resposta.
+- Valores `NaN`, infinitos e datas sao convertidos para formatos seguros.
+- Dashboards vinculados podem ser marcados como desatualizados quando a fonte muda.
+- Falhas de refresh automatico geram notificacoes para o usuario.
 
-<!-- README atualizado para manter a documentacao do projeto sincronizada. -->
+## Observacoes de manutencao
+
+- A pasta `migrations/` foi removida deste repositorio.
+- Se o time retomar versionamento formal de schema, recomenda-se usar Alembic ou ferramenta equivalente.
+- O CORS esta configurado com `allow_origins=["*"]`; em producao, uma evolucao natural e restringir para os dominios oficiais do frontend.
+- O arquivo `requirements.txt` contem dependencias alem do nucleo da API; uma melhoria futura seria separar dependencias de runtime e desenvolvimento.
+
+## Resumo tecnico para recrutadores
+
+Este projeto demonstra um backend FastAPI com responsabilidades reais de produto: autenticacao, persistencia relacional, upload e normalizacao de dados, colaboracao, notificacoes, integracao entre microservicos e suporte a dashboards gerados por IA.
+
+O ponto forte da arquitetura esta na separacao por dominio e na orquestracao entre dados do usuario, graficos persistidos e analises recalculadas pelo AI Agent. A API resolve problemas comuns de SaaS em producao: sessao expirada, permissao por recurso, dados compartilhados, refresh assincrono, tratamento de uploads, validacao de payloads e sincronizacao entre servicos.
