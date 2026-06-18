@@ -4,15 +4,28 @@ from datetime import datetime, timezone, timedelta
 
 
 class JWT:
+    ACCESS_TOKEN_EXPIRE_HOURS = 12
+
+    def secret(self) -> str:
+        secret = data().secret()
+
+        if not secret or len(secret) < 32:
+            raise RuntimeError("SECRET precisa ter pelo menos 32 caracteres.")
+
+        return secret
+
     def token(self, email: str, user_id: int, status: bool, role: str) -> str:
+        now = datetime.now(timezone.utc)
         payload = {
             "user_id": user_id,
             "email": email,
             "status": status,
-            "role": role
+            "role": role,
+            "iat": now,
+            "exp": now + timedelta(hours=self.ACCESS_TOKEN_EXPIRE_HOURS),
         }
 
-        return jwt.encode(payload, data().secret(), algorithm="HS256")
+        return jwt.encode(payload, self.secret(), algorithm="HS256")
 
     def get_jwt(self, key: str, token: str):
         if key not in ["user_id", "email", "role", "status"]:
@@ -21,8 +34,9 @@ class JWT:
         try:
             payload = jwt.decode(
                 token,
-                data().secret(),
-                algorithms=["HS256"]
+                self.secret(),
+                algorithms=["HS256"],
+                options={"require_exp": True},
             )
             return payload.get(key)
 
@@ -33,8 +47,9 @@ class JWT:
         try:
             return jwt.decode(
                 token,
-                data().secret(),
-                algorithms=["HS256"]
+                self.secret(),
+                algorithms=["HS256"],
+                options={"require_exp": True},
             )
         except JWTError:
             return None
@@ -48,7 +63,7 @@ class JWT:
 
         return jwt.encode(
             payload,
-            data().secret(),
+            self.secret(),
             algorithm="HS256"
         )
 
@@ -56,7 +71,7 @@ class JWT:
         try:
             payload = jwt.decode(
                 token,
-                data().secret(),
+                self.secret(),
                 algorithms=["HS256"]
             )
 

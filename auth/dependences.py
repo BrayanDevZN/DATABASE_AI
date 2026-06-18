@@ -13,24 +13,34 @@ class Valid:
     
     
     def auth_admin(self, token:bytes) -> bool:
-        data = self.jwt.decode(token)
+        payload = self.jwt.decode(token)
+
+        if not payload or "user_id" not in payload:
+            return False
+
         with engine.connect() as session:
-                data = session.execute(text(f'SELECT * from users where user_id= :user_id'), {"user_id": data["user_id"]})
-                user = data.fetchone()
+                result = session.execute(text('SELECT * from users where user_id= :user_id'), {"user_id": payload["user_id"]})
+                user = result.fetchone()
+
+        if user is None:
+            return False
+
         role = self.jwt.get_jwt(token=token, key="role")
-       
-        return True if (self.jwt.get_jwt(token=token, key="role") == "admin") and (user["role"] == role) else False
+
+        return role == "admin" and user._mapping["role"] == role
         
     
     def auth_jwt(self, token:bytes) -> bool:
-        data = self.jwt.decode(token)
+        payload = self.jwt.decode(token)
+
+        if not payload or "user_id" not in payload:
+            return False
+
         with engine.connect() as session:
-                data = session.execute(text(f'SELECT * from users where user_id= :user_id'), {"user_id": data["user_id"]})
-                user = data.fetchone()
-                       
-        
-        
-        return True if user is not None else False
+                result = session.execute(text('SELECT * from users where user_id= :user_id'), {"user_id": payload["user_id"]})
+                user = result.fetchone()
+
+        return user is not None
      
 
             

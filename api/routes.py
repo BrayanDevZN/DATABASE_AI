@@ -1,8 +1,11 @@
 import io
+import ipaddress
 import json
 import math
 import os
+import socket
 from datetime import date, datetime
+from urllib.parse import urlparse
 
 import polars as pl
 import requests
@@ -10,6 +13,7 @@ import requests
 from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 
 import api.model.model_accounts as models
 import api.model.model_conversation as conversation_models
@@ -31,10 +35,20 @@ app = FastAPI()
 collaborations = ManagerCollaborations()
 accounts_repository = RepositoryAccount()
 AI_URL = os.getenv("AI_URL", "https://web-production-40ead.up.railway.app")
+MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(10 * 1024 * 1024)))
+MAX_WEB_PAYLOAD_BYTES = int(os.getenv("MAX_WEB_PAYLOAD_BYTES", str(5 * 1024 * 1024)))
+ALLOWED_CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173,https://datapilotplataform.com,https://www.datapilotplataform.com",
+    ).split(",")
+    if origin.strip()
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_CORS_ORIGINS,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -126,6 +140,9 @@ def format_data_source_database_error(error: Exception) -> str:
 
 def read_uploaded_file(file: UploadFile) -> tuple[list[dict], int, int]:
     content = file.file.read()
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise ValueError("Arquivo muito grande. Envie um arquivo menor.")
+
     filename = file.filename.lower()
 
     if filename.endswith(".csv"):
@@ -172,8 +189,16 @@ def read_web_source(url: str) -> tuple[list[dict], int, int]:
     if not url or not url.strip():
         raise ValueError("URL da API e obrigatoria.")
 
-    response = requests.get(url.strip(), timeout=30)
+    clean_url = validate_public_http_url(url.strip())
+    response = requests.get(clean_url, timeout=30)
     response.raise_for_status()
+
+    content_length = response.headers.get("content-length")
+    if content_length and int(content_length) > MAX_WEB_PAYLOAD_BYTES:
+        raise ValueError("A resposta da API e grande demais.")
+
+    if len(response.content) > MAX_WEB_PAYLOAD_BYTES:
+        raise ValueError("A resposta da API e grande demais.")
 
     return normalize_rows(response.json())
 
@@ -181,6 +206,9 @@ def read_web_source(url: str) -> tuple[list[dict], int, int]:
 def read_web_payload(api_payload: str | None) -> tuple[list[dict], int, int]:
     if not api_payload or not api_payload.strip():
         raise ValueError("URL da API e obrigatoria.")
+
+    if len(api_payload.encode("utf-8")) > MAX_WEB_PAYLOAD_BYTES:
+        raise ValueError("A resposta da API e grande demais.")
 
     try:
         payload = json.loads(api_payload)
@@ -199,15 +227,80 @@ def read_database_source(database_url: str, query: str) -> tuple[list[dict], int
 
     clean_query = query.strip()
 
-    if not clean_query.lower().startswith("select"):
+    if not clean_query.lower().startswith("select") or ";" in clean_query:
         raise ValueError("Use apenas consultas SELECT para fontes de banco.")
 
-    engine = create_engine(database_url.strip(), pool_pre_ping=True)
+    clean_database_url = validate_public_database_url(database_url.strip())
+    engine = create_engine(clean_database_url, pool_pre_ping=True)
 
     with engine.connect() as session:
         rows = session.execute(text(clean_query)).mappings().all()
 
     return normalize_rows([dict(row) for row in rows])
+
+
+def validate_public_http_url(url: str) -> str:
+    parsed = urlparse(url)
+
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        raise ValueError("URL da API invalida.")
+
+    hostname = parsed.hostname
+
+    if hostname in ("localhost",) or hostname.endswith(".localhost"):
+        raise ValueError("Use uma URL publica, nao localhost.")
+
+    try:
+        addresses = socket.getaddrinfo(hostname, parsed.port, type=socket.SOCK_STREAM)
+    except socket.gaierror:
+        raise ValueError("Nao foi possivel resolver a URL da API.")
+
+    for address in addresses:
+        ip = ipaddress.ip_address(address[4][0])
+        if (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_multicast
+            or ip.is_reserved
+            or ip.is_unspecified
+        ):
+            raise ValueError("Use uma URL publica, nao um endereco interno.")
+
+    return url
+
+
+def validate_public_database_url(database_url: str) -> str:
+    try:
+        parsed = make_url(database_url)
+    except Exception:
+        raise ValueError("URL de conexao do banco invalida.")
+
+    hostname = parsed.host
+    if not hostname:
+        raise ValueError("URL de conexao do banco invalida.")
+
+    if hostname in ("localhost",) or hostname.endswith(".localhost"):
+        raise ValueError("Use um banco com host publico, nao localhost.")
+
+    try:
+        addresses = socket.getaddrinfo(hostname, parsed.port, type=socket.SOCK_STREAM)
+    except socket.gaierror:
+        raise ValueError("Nao foi possivel resolver o host do banco.")
+
+    for address in addresses:
+        ip = ipaddress.ip_address(address[4][0])
+        if (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_multicast
+            or ip.is_reserved
+            or ip.is_unspecified
+        ):
+            raise ValueError("Use um banco com host publico, nao um endereco interno.")
+
+    return database_url
 
 
 def normalize_refresh_interval(value: int | str | None) -> int | None:
