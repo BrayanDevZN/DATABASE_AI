@@ -24,5 +24,3 @@ class SupabaseConnect:
     def connect(self):
         engine = create_engine(self.base_url())#RETORNA A CONEXÃO
         return engine
-        
-   
