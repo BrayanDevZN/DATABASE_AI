@@ -1,5 +1,5 @@
 
-from sqlalchemy import create_engine
+from sqlalchemy import URL, create_engine
 from dotenv import load_dotenv
 
 class SupabaseConnect:
@@ -12,7 +12,14 @@ class SupabaseConnect:
         self.__port = port
         
     def base_url(self):
-        return f"postgresql+psycopg://{self.__user}:{self.__pass}@{self.__host}:{self.__port}/{self.__name}"#CONNECTA COM O BANCO
+        return URL.create(
+            "postgresql+psycopg",
+            username=self.__user,
+            password=self.__pass,
+            host=self.__host,
+            port=self.__port,
+            database=self.__name,
+        )#CONNECTA COM O BANCO
     
     def connect(self):
         engine = create_engine(self.base_url())#RETORNA A CONEXÃO
