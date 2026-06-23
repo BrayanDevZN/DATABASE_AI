@@ -1,6 +1,7 @@
 from jose import jwt, JWTError
 from core.config import data
 from datetime import datetime, timezone, timedelta
+from hashlib import sha256
 
 
 class JWT:
@@ -9,8 +10,11 @@ class JWT:
     def secret(self) -> str:
         secret = data().secret()
 
-        if not secret or len(secret) < 32:
-            raise RuntimeError("SECRET precisa ter pelo menos 32 caracteres.")
+        if not secret:
+            raise RuntimeError("SECRET precisa estar configurado.")
+
+        if len(secret) < 32:
+            return sha256(secret.encode("utf-8")).hexdigest()
 
         return secret
 
