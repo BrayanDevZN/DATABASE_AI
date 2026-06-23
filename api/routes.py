@@ -10,10 +10,12 @@ from urllib.parse import urlparse
 import polars as pl
 import requests
 
-from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile, status
+from fastapi import Body, FastAPI, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
+from sqlalchemy.exc import SQLAlchemyError
 
 import api.model.model_accounts as models
 import api.model.model_conversation as conversation_models
@@ -65,6 +67,39 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def cors_error_headers(request: Request) -> dict[str, str]:
+    origin = request.headers.get("origin")
+
+    if origin not in ALLOWED_CORS_ORIGINS:
+        return {}
+
+    return {
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Credentials": "false",
+        "Vary": "Origin",
+    }
+
+
+@app.exception_handler(SQLAlchemyError)
+async def database_exception_handler(request: Request, exc: SQLAlchemyError):
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": "Banco de dados indisponivel. Verifique as variaveis de conexao no deploy."
+        },
+        headers=cors_error_headers(request),
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Erro interno na API."},
+        headers=cors_error_headers(request),
+    )
 
 
 def make_json_safe(value):
