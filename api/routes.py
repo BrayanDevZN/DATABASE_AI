@@ -37,14 +37,26 @@ accounts_repository = RepositoryAccount()
 AI_URL = os.getenv("AI_URL", "https://web-production-40ead.up.railway.app")
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(10 * 1024 * 1024)))
 MAX_WEB_PAYLOAD_BYTES = int(os.getenv("MAX_WEB_PAYLOAD_BYTES", str(5 * 1024 * 1024)))
-ALLOWED_CORS_ORIGINS = [
+DEFAULT_CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://datapilotplatform.com",
+    "https://www.datapilotplatform.com",
+    "http://datapilotplatform.com",
+    "http://www.datapilotplatform.com",
+    "https://datapilotplataform.com",
+    "https://www.datapilotplataform.com",
+    "http://datapilotplataform.com",
+    "http://www.datapilotplataform.com",
+]
+
+CONFIGURED_CORS_ORIGINS = [
     origin.strip()
-    for origin in os.getenv(
-        "CORS_ALLOWED_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173,https://datapilotplatform.com,https://www.datapilotplatform.com,http://datapilotplatform.com,http://www.datapilotplatform.com,https://datapilotplataform.com,https://www.datapilotplataform.com,http://datapilotplataform.com,http://www.datapilotplataform.com",
-    ).split(",")
+    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
     if origin.strip()
 ]
+
+ALLOWED_CORS_ORIGINS = list(dict.fromkeys(DEFAULT_CORS_ORIGINS + CONFIGURED_CORS_ORIGINS))
 
 app.add_middleware(
     CORSMiddleware,
