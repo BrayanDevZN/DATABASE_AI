@@ -1,12 +1,20 @@
+import logging
+
 from sqlalchemy import text
 
+
 from connect.manager_database import main_database
+
+logger = logging.getLogger(__name__)
 
 
 class ManagerCollaborations:
     def __init__(self) -> None:
         self.db = main_database()
-        self.ensure_notification_columns()
+        try:
+            self.ensure_notification_columns()
+        except Exception:
+            logger.exception("Could not prepare collaboration notification tables during startup.")
 
     def ensure_notification_columns(self) -> None:
         with self.db.connect() as session:
